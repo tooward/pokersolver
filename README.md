@@ -1,5 +1,7 @@
 ## Description
-pokersolver is a poker hand solver and comparison tool written in Javascript. It was written for and is being used in production on [**CasinoRPG**](http://casinorpg.com), an HTML5 MMORPG that features Texas Hold'em as one of its main casino games. It is designed for use on either the client (browser) or the server (Node.js). This library is capable of:
+This is an updated version of the [pokersolver library](https://github.com/goldfire/pokersolver). I'm a n00b so I cloned it and figured since the changes are significant moving to TypeScript a fork might not be appropriate. All the hard work credit goes to the original authors.
+
+Pokersolver is a poker hand solver and comparison tool written in Javascript. It was written for and is being used in production on [**CasinoRPG**](http://casinorpg.com), an HTML5 MMORPG that features Texas Hold'em as one of its main casino games. It is designed for use on either the client (browser) or the server (Node.js). This library is capable of:
 
 * Evaluating a hand of up to 7 cards
 * Calculating the score of the hand (0-9)
