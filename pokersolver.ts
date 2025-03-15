@@ -304,7 +304,7 @@ declare var exports: any;
   // --------------------------
 
   export class StraightFlush extends Hand {
-    constructor(cards: Array<string | Card>, game: Game, canDisqualify: boolean) {
+    constructor(cards: Array<string | Card>, game: Game, canDisqualify: boolean = false) {
       super(cards, "Straight Flush", game, canDisqualify);
     }
     solve(): boolean {
@@ -350,7 +350,7 @@ declare var exports: any;
   }
 
   export class RoyalFlush extends StraightFlush {
-    constructor(cards: Array<string | Card>, game: Game, canDisqualify: boolean) {
+    constructor(cards: Array<string | Card>, game: Game, canDisqualify: boolean = false) {
       super(cards, game, canDisqualify);
     }
     solve(): boolean {
@@ -361,7 +361,7 @@ declare var exports: any;
   }
 
   export class NaturalRoyalFlush extends RoyalFlush {
-    constructor(cards: Array<string | Card>, game: Game, canDisqualify: boolean) {
+    constructor(cards: Array<string | Card>, game: Game, canDisqualify: boolean = false) {
       super(cards, game, canDisqualify);
     }
     solve(): boolean {
@@ -385,7 +385,7 @@ declare var exports: any;
   }
 
   export class WildRoyalFlush extends RoyalFlush {
-    constructor(cards: Array<string | Card>, game: Game, canDisqualify: boolean) {
+    constructor(cards: Array<string | Card>, game: Game, canDisqualify: boolean = false) {
       super(cards, game, canDisqualify);
     }
     solve(): boolean {
@@ -409,7 +409,7 @@ declare var exports: any;
   }
 
   export class FiveOfAKind extends Hand {
-    constructor(cards: Array<string | Card>, game: Game, canDisqualify: boolean) {
+    constructor(cards: Array<string | Card>, game: Game, canDisqualify: boolean = false) {
       super(cards, "Five of a Kind", game, canDisqualify);
     }
     solve(): boolean {
@@ -449,7 +449,7 @@ declare var exports: any;
   }
 
   export class FourOfAKindPairPlus extends Hand {
-    constructor(cards: Array<string | Card>, game: Game, canDisqualify: boolean) {
+    constructor(cards: Array<string | Card>, game: Game, canDisqualify: boolean = false) {
       super(cards, "Four of a Kind with Pair or Better", game, canDisqualify);
     }
     solve(): boolean {
@@ -525,7 +525,7 @@ declare var exports: any;
   }
 
   export class FourOfAKind extends Hand {
-    constructor(cards: Array<string | Card>, game: Game, canDisqualify: boolean) {
+    constructor(cards: Array<string | Card>, game: Game, canDisqualify: boolean = false) {
       super(cards, "Four of a Kind", game, canDisqualify);
     }
     solve(): boolean {
@@ -571,7 +571,7 @@ declare var exports: any;
   }
 
   export class FourWilds extends Hand {
-    constructor(cards: Array<string | Card>, game: Game, canDisqualify: boolean) {
+    constructor(cards: Array<string | Card>, game: Game, canDisqualify: boolean = false) {
       super(cards, "Four Wild Cards", game, canDisqualify);
     }
     solve(): boolean {
@@ -592,7 +592,7 @@ declare var exports: any;
   }
 
   export class ThreeOfAKindTwoPair extends Hand {
-    constructor(cards: Array<string | Card>, game: Game, canDisqualify: boolean) {
+    constructor(cards: Array<string | Card>, game: Game, canDisqualify: boolean = false) {
       super(cards, "Three of a Kind with Two Pair", game, canDisqualify);
     }
     solve(): boolean {
@@ -681,7 +681,7 @@ declare var exports: any;
   }
 
   export class FullHouse extends Hand {
-    constructor(cards: Array<string | Card>, game: Game, canDisqualify: boolean) {
+    constructor(cards: Array<string | Card>, game: Game, canDisqualify: boolean = false) {
       super(cards, "Full House", game, canDisqualify);
     }
     solve(): boolean {
@@ -751,7 +751,7 @@ declare var exports: any;
   }
 
   export class Flush extends Hand {
-    constructor(cards: Array<string | Card>, game: Game, canDisqualify: boolean) {
+    constructor(cards: Array<string | Card>, game: Game, canDisqualify: boolean = false) {
       super(cards, "Flush", game, canDisqualify);
     }
     solve(): boolean {
@@ -783,7 +783,7 @@ declare var exports: any;
   }
 
   export class Straight extends Hand {
-    constructor(cards: Array<string | Card>, game: Game, canDisqualify: boolean) {
+    constructor(cards: Array<string | Card>, game: Game, canDisqualify: boolean = false) {
       super(cards, "Straight", game, canDisqualify);
     }
     sfQualify: number = 0; // additional property used below
@@ -986,7 +986,7 @@ declare var exports: any;
   }
 
   export class TwoThreeOfAKind extends Hand {
-    constructor(cards: Array<string | Card>, game: Game, canDisqualify: boolean) {
+    constructor(cards: Array<string | Card>, game: Game, canDisqualify: boolean = false) {
       super(cards, "Two Three Of a Kind", game, canDisqualify);
     }
     solve(): boolean {
@@ -1048,7 +1048,7 @@ declare var exports: any;
   }
 
   export class ThreeOfAKind extends Hand {
-    constructor(cards: Array<string | Card>, game: Game, canDisqualify: boolean) {
+    constructor(cards: Array<string | Card>, game: Game, canDisqualify: boolean = false) {
       super(cards, "Three of a Kind", game, canDisqualify);
     }
     solve(): boolean {
@@ -1091,7 +1091,7 @@ declare var exports: any;
   }
 
   export class ThreePair extends Hand {
-    constructor(cards: Array<string | Card>, game: Game, canDisqualify: boolean) {
+    constructor(cards: Array<string | Card>, game: Game, canDisqualify: boolean = false) {
       super(cards, "Three Pair", game, canDisqualify);
     }
     solve(): boolean {
@@ -1155,7 +1155,7 @@ declare var exports: any;
   }
 
   export class TwoPair extends Hand {
-    constructor(cards: Array<string | Card>, game: Game, canDisqualify: boolean) {
+    constructor(cards: Array<string | Card>, game: Game, canDisqualify: boolean = false) {
       super(cards, "Two Pair", game, canDisqualify);
     }
     solve(): boolean {
@@ -1220,7 +1220,7 @@ declare var exports: any;
   }
 
   export class OnePair extends Hand {
-    constructor(cards: Array<string | Card>, game: Game, canDisqualify: boolean) {
+    constructor(cards: Array<string | Card>, game: Game, canDisqualify: boolean = false) {
       super(cards, "Pair", game, canDisqualify);
     }
     solve(): boolean {
@@ -1263,7 +1263,7 @@ declare var exports: any;
   }
 
   export class HighCard extends Hand {
-    constructor(cards: Array<string | Card>, game: Game, canDisqualify: boolean) {
+    constructor(cards: Array<string | Card>, game: Game, canDisqualify: boolean = false) {
       super(cards, "High Card", game, canDisqualify);
     }
     solve(): boolean {
