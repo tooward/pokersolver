@@ -14,7 +14,7 @@ var Game = require('../pokersolver').Game;
 
 var gameForTest = new Game('deuceswild');
 
-// Deuces Wild is designed to be for five cards, but can be for any number.
+// Deuces Wild is designed to be for five cards, but can be for any number
 describe('A basic hand', function() {
   it('should return a hand with cards sorted descending, wilds last', function() {
     var hand = Hand.solve(['Kh', 'Tc', 'As', '3s', '2h'], gameForTest);

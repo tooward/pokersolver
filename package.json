@@ -20,11 +20,16 @@
     "url": "https://raw.githubusercontent.com/goldfire/pokersolver/master/LICENSE.md"
   },
   "devDependencies": {
+    "@types/mocha": "^10.0.10",
+    "@types/should": "^11.2.0",
     "mocha": "*",
-    "should": "*"
+    "should": "*",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.8.2"
   },
   "scripts": {
-    "test": "mocha test/test.js"
+    "test": "mocha test/test.js",
+    "build": "tsc"
   },
   "engines": [
     "node >= 4.0.0"
