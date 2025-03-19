@@ -1,0 +1,292 @@
+import 'should';
+import {
+  Hand,
+  Flush,
+  StraightFlush,
+  Straight,
+  FourOfAKind,
+  FullHouse,
+  ThreeOfAKind,
+  TwoPair,
+  OnePair,
+  Game,
+} from '../pokersolver.ts.modified';
+import { CardRank } from '../pokersolver.ts.modified';
+
+const gameForTest = new Game('standard');
+
+describe('A basic hand', function () {
+  it('should return a hand with cards sorted descending', function () {
+    const hand = Hand.solve([{ rank: CardRank.K, suit: 'h' }, { rank: CardRank.T, suit: 'c' }, { rank: CardRank._5, suit: 'd' }, { rank: CardRank.A, suit: 's' }, { rank: CardRank._3, suit: 'c' }, { rank: CardRank._3, suit: 's' }, { rank: CardRank._2, suit: 'h' }], gameForTest);
+    hand.cardPool[0].toString().should.equal({ rank: CardRank.A, suit: 's' });
+    hand.cardPool[6].toString().should.equal({ rank: CardRank._2, suit: 'h' });
+  });
+  it('should return a correct description', function () {
+    const hand = Hand.solve([{ rank: CardRank.K, suit: 'h' }, { rank: CardRank.T, suit: 'c' }, { rank: CardRank._5, suit: 'd' }, { rank: CardRank.A, suit: 's' }, { rank: CardRank._3, suit: 'c' }, { rank: CardRank._3, suit: 's' }, { rank: CardRank._2, suit: 'h' }], gameForTest);
+    hand.descr.should.equal("Pair, 3's");
+  });
+  it('should throw an Error for a hand with duplicate cards', function () {
+    (() => {
+      Hand.solve([{ rank: CardRank.A, suit: 's' }, { rank: CardRank.Q, suit: 'h' }, { rank: CardRank.T, suit: 's' }, { rank: CardRank.A, suit: 's' }, { rank: CardRank._2, suit: 'd' }], gameForTest);
+    }).should.throw();
+  });
+});
+
+describe('A Straight Flush', function () {
+  it('should be detected as possible', function () {
+    const hand = new StraightFlush(
+      [{ rank: CardRank.Q, suit: 'd' }, { rank: CardRank._7, suit: 's' }, { rank: CardRank._8, suit: 's' }, { rank: CardRank.J, suit: 's' }, { rank: CardRank.K, suit: 'h' }, { rank: CardRank.T, suit: 's' }, { rank: CardRank._9, suit: 's' }],
+      gameForTest
+    );
+    hand.isPossible.should.equal(true);
+  });
+  it('should be detected as not possible', function () {
+    const hand = new StraightFlush(
+      [{ rank: CardRank.Q, suit: 'd' }, { rank: CardRank._7, suit: 's' }, { rank: CardRank._8, suit: 's' }, { rank: CardRank.J, suit: 's' }, { rank: CardRank.K, suit: 'h' }, { rank: CardRank.T, suit: 's' }, { rank: CardRank._9, suit: 'd' }],
+      gameForTest
+    );
+    hand.isPossible.should.equal(false);
+  });
+  it('should return 5 cards with low ace', function () {
+    const hand = new StraightFlush(
+      [{ rank: CardRank.A, suit: 'd' }, { rank: CardRank._2, suit: 'd' }, { rank: CardRank._3, suit: 'd' }, { rank: CardRank._4, suit: 'd' }, { rank: CardRank._5, suit: 'd' }, { rank: CardRank.T, suit: 's' }, { rank: CardRank._9, suit: 'd' }],
+      gameForTest
+    );
+    hand.cards.length.should.equal(5);
+  });
+});
+
+describe('A Four of a Kind', function () {
+  it('should be detected as possible', function () {
+    const hand = new FourOfAKind(
+      [{ rank: CardRank._7, suit: 'h' }, { rank: CardRank._7, suit: 'd' }, { rank: CardRank._3, suit: 's' }, { rank: CardRank._2, suit: 'c' }, { rank: CardRank._7, suit: 's' }, { rank: CardRank._7, suit: 'c' }, { rank: CardRank._4, suit: 's' }],
+      gameForTest
+    );
+    hand.isPossible.should.equal(true);
+  });
+  it('should be detected as not possible', function () {
+    const hand = new FourOfAKind(
+      [{ rank: CardRank._7, suit: 'h' }, { rank: CardRank._3, suit: 'd' }, { rank: CardRank._3, suit: 's' }, { rank: CardRank._2, suit: 'c' }, { rank: CardRank._7, suit: 's' }, { rank: CardRank._7, suit: 'c' }, { rank: CardRank._4, suit: 's' }],
+      gameForTest
+    );
+    hand.isPossible.should.equal(false);
+  });
+});
+
+describe('A Full House', function () {
+  it('should be detected as possible', function () {
+    let hand = new FullHouse(
+      [{ rank: CardRank.Q, suit: 'd' }, { rank: CardRank.J, suit: 's' }, { rank: CardRank._3, suit: 'h' }, { rank: CardRank.Q, suit: 'c' }, { rank: CardRank._7, suit: 'd' }, { rank: CardRank.J, suit: 'c' }, { rank: CardRank.J, suit: 'd' }],
+      gameForTest
+    );
+    hand.isPossible.should.equal(true);
+    hand = new FullHouse(
+      [{ rank: CardRank._9, suit: 'c' }, { rank: CardRank._9, suit: 'd' }, { rank: CardRank.J, suit: 'h' }, { rank: CardRank.J, suit: 'c' }, { rank: CardRank.J, suit: 's' }, { rank: CardRank._9, suit: 'h' }, { rank: CardRank.A, suit: 's' }],
+      gameForTest
+    );
+    hand.isPossible.should.equal(true);
+  });
+  it('should be detected as not possible', function () {
+    let hand = new FullHouse(
+      [{ rank: CardRank._5, suit: 'h' }, { rank: CardRank._3, suit: 'h' }, { rank: CardRank._3, suit: 'c' }, { rank: CardRank._5, suit: 'd' }, { rank: CardRank._2, suit: 's' }, { rank: CardRank.T, suit: 's' }, { rank: CardRank.T, suit: 'd' }],
+      gameForTest
+    );
+    hand.isPossible.should.equal(false);
+    hand = new FullHouse(
+      [{ rank: CardRank._5, suit: 's' }, { rank: CardRank._9, suit: 'd' }, { rank: CardRank.K, suit: 'd' }, { rank: CardRank._6, suit: 'h' }, { rank: CardRank._7, suit: 's' }, { rank: CardRank._7, suit: 'd' }, { rank: CardRank.K, suit: 'h' }],
+      gameForTest
+    );
+    hand.isPossible.should.equal(false);
+    hand = new FullHouse(
+      [{ rank: CardRank._9, suit: 'h' }, { rank: CardRank._9, suit: 's' }, { rank: CardRank._3, suit: 'd' }, { rank: CardRank._5, suit: 'c' }, { rank: CardRank.K, suit: 'd' }, { rank: CardRank._5, suit: 'd' }, { rank: CardRank.K, suit: 'h' }],
+      gameForTest
+    );
+    hand.isPossible.should.equal(false);
+  });
+  it('should pick the high kickers', function () {
+    const hand = new FullHouse(
+      [{ rank: CardRank._5, suit: 'd' }, { rank: CardRank._5, suit: 'h' }, { rank: CardRank._3, suit: 'h' }, { rank: CardRank._3, suit: 'c' }, { rank: CardRank.Q, suit: 'h' }, { rank: CardRank.Q, suit: 'd' }, { rank: CardRank.Q, suit: 's' }],
+      gameForTest
+    );
+    hand.cards.toString().indexOf({ rank: CardRank._3, suit: 'h' }).should.equal(-1);
+  });
+  it('should be in order', function () {
+    const hand = new FullHouse(
+      [{ rank: CardRank._9, suit: 'c' }, { rank: CardRank.Q, suit: 's' }, { rank: CardRank._9, suit: 'h' }, { rank: CardRank._5, suit: 'h' }, { rank: CardRank.T, suit: 's' }, { rank: CardRank.Q, suit: 'c' }, { rank: CardRank.Q, suit: 'h' }],
+      gameForTest
+    );
+    hand.cards.toString().should.equal('Qs,Qc,Qh,9c,9h');
+  });
+});
+
+describe('A Flush', function () {
+  it('should be detected as possible', function () {
+    const hand = new Flush(
+      [{ rank: CardRank._4, suit: 'h' }, { rank: CardRank.T, suit: 'h' }, { rank: CardRank._5, suit: 'h' }, { rank: CardRank.A, suit: 'c' }, { rank: CardRank._2, suit: 'h' }, { rank: CardRank.K, suit: 'h' }, { rank: CardRank._8, suit: 'd' }],
+      gameForTest
+    );
+    hand.isPossible.should.equal(true);
+  });
+  it('should be detected as not possible', function () {
+    const hand = new Flush(
+      [{ rank: CardRank._4, suit: 's' }, { rank: CardRank.T, suit: 'h' }, { rank: CardRank._5, suit: 'h' }, { rank: CardRank.A, suit: 'c' }, { rank: CardRank._2, suit: 'h' }, { rank: CardRank.K, suit: 'h' }, { rank: CardRank._8, suit: 'd' }],
+      gameForTest
+    );
+    hand.isPossible.should.equal(false);
+  });
+});
+
+describe('A Straight', function () {
+  it('should be detected as possible', function () {
+    const hand = new Straight(
+      [{ rank: CardRank._5, suit: 'c' }, { rank: CardRank._6, suit: 's' }, { rank: CardRank._3, suit: 's' }, { rank: CardRank._2, suit: 's' }, { rank: CardRank._5, suit: 's' }, { rank: CardRank._4, suit: 's' }, { rank: CardRank._5, suit: 'd' }],
+      gameForTest
+    );
+    hand.isPossible.should.equal(true);
+  });
+  it('should be detected as possible', function () {
+    const hand = new Straight(
+      [{ rank: CardRank._5, suit: 'd' }, { rank: CardRank._6, suit: 's' }, { rank: CardRank._7, suit: 's' }, { rank: CardRank._8, suit: 'c' }, { rank: CardRank.T, suit: 's' }, { rank: CardRank._9, suit: 's' }, { rank: CardRank._2, suit: 'd' }],
+      gameForTest
+    );
+    hand.isPossible.should.equal(true);
+  });
+  it('should be detected as not possible', function () {
+    const hand = new Straight(
+      [{ rank: CardRank._5, suit: 'h' }, { rank: CardRank._6, suit: 's' }, { rank: CardRank._6, suit: 'h' }, { rank: CardRank._7, suit: 'c' }, { rank: CardRank._2, suit: 's' }, { rank: CardRank.T, suit: 's' }, { rank: CardRank._8, suit: 'd' }],
+      gameForTest
+    );
+    hand.isPossible.should.equal(false);
+  });
+  it('should detect a low ace', function () {
+    const hand = new Straight(
+      [{ rank: CardRank._2, suit: 'c' }, { rank: CardRank._3, suit: 's' }, { rank: CardRank._4, suit: 'h' }, { rank: CardRank._5, suit: 'c' }, { rank: CardRank.A, suit: 's' }, { rank: CardRank.T, suit: 's' }, { rank: CardRank._8, suit: 'd' }],
+      gameForTest
+    );
+    hand.isPossible.should.equal(true);
+  });
+  it('should detect a high ace', function () {
+    const hand = new Straight(
+      [{ rank: CardRank._2, suit: 'd' }, { rank: CardRank._3, suit: 's' }, { rank: CardRank._4, suit: 'h' }, { rank: CardRank._7, suit: 'c' }, { rank: CardRank.A, suit: 's' }, { rank: CardRank.T, suit: 's' }, { rank: CardRank.K, suit: 'd' }],
+      gameForTest
+    );
+    hand.isPossible.should.equal(false);
+  });
+  it('should know that an ace is not high in a wheel', function () {
+    const lowHand = new Straight(
+      [{ rank: CardRank._2, suit: 's' }, { rank: CardRank._3, suit: 's' }, { rank: CardRank._4, suit: 'h' }, { rank: CardRank._5, suit: 'c' }, { rank: CardRank.A, suit: 's' }, { rank: CardRank.T, suit: 's' }, { rank: CardRank._8, suit: 'd' }],
+      gameForTest
+    );
+    const highHand = new Straight(
+      [{ rank: CardRank._2, suit: 's' }, { rank: CardRank._3, suit: 's' }, { rank: CardRank._4, suit: 'h' }, { rank: CardRank._5, suit: 'c' }, { rank: CardRank._6, suit: 's' }, { rank: CardRank.T, suit: 's' }, { rank: CardRank._8, suit: 'd' }],
+      gameForTest
+    );
+    highHand.loseTo(lowHand).should.equal(false);
+  });
+});
+
+describe('Three of a Kind', function () {
+  it('should be detected as possible', function () {
+    const hand = new ThreeOfAKind(
+      [{ rank: CardRank._5, suit: 'c' }, { rank: CardRank._5, suit: 's' }, { rank: CardRank._5, suit: 'h' }, { rank: CardRank._6, suit: 'c' }, { rank: CardRank.T, suit: 'd' }, { rank: CardRank._9, suit: 's' }, { rank: CardRank._2, suit: 'd' }],
+      gameForTest
+    );
+    hand.isPossible.should.equal(true);
+    hand.toString().should.equal('5c, 5s, 5h, 10d, 9s');
+  });
+  it('should be detected as not possible', function () {
+    const hand = new ThreeOfAKind(
+      [{ rank: CardRank._5, suit: 'c' }, { rank: CardRank._2, suit: 'h' }, { rank: CardRank._5, suit: 'h' }, { rank: CardRank._6, suit: 'c' }, { rank: CardRank.T, suit: 's' }, { rank: CardRank._9, suit: 's' }, { rank: CardRank._2, suit: 'd' }],
+      gameForTest
+    );
+    hand.isPossible.should.equal(false);
+  });
+});
+
+describe('Two Pair', function () {
+  it('should be detected as possible', function () {
+    const hand = new TwoPair(
+      [{ rank: CardRank._5, suit: 'c' }, { rank: CardRank._5, suit: 'd' }, { rank: CardRank._6, suit: 's' }, { rank: CardRank._6, suit: 'c' }, { rank: CardRank.T, suit: 'd' }, { rank: CardRank._9, suit: 's' }, { rank: CardRank._2, suit: 'd' }],
+      gameForTest
+    );
+    hand.isPossible.should.equal(true);
+  });
+  it('should be detected as not possible', function () {
+    const hand = new TwoPair(
+      [{ rank: CardRank._5, suit: 'c' }, { rank: CardRank._6, suit: 's' }, { rank: CardRank._6, suit: 'h' }, { rank: CardRank._7, suit: 'c' }, { rank: CardRank._2, suit: 'd' }, { rank: CardRank.T, suit: 's' }, { rank: CardRank._8, suit: 'd' }],
+      gameForTest
+    );
+    hand.isPossible.should.equal(false);
+  });
+});
+
+describe('One Pair', function () {
+  it('should be detected as possible', function () {
+    const hand = new OnePair(
+      [{ rank: CardRank._5, suit: 'h' }, { rank: CardRank._5, suit: 'c' }, { rank: CardRank._7, suit: 's' }, { rank: CardRank._6, suit: 'c' }, { rank: CardRank.T, suit: 's' }, { rank: CardRank._9, suit: 's' }, { rank: CardRank._2, suit: 'd' }],
+      gameForTest
+    );
+    hand.isPossible.should.equal(true);
+  });
+  it('should be detected as not possible', function () {
+    const hand = new OnePair(
+      [{ rank: CardRank._5, suit: 'h' }, { rank: CardRank._6, suit: 's' }, { rank: CardRank.J, suit: 'h' }, { rank: CardRank._7, suit: 'c' }, { rank: CardRank._2, suit: 's' }, { rank: CardRank.T, suit: 's' }, { rank: CardRank._8, suit: 'd' }],
+      gameForTest
+    );
+    hand.isPossible.should.equal(false);
+  });
+  it('should select the correct winner', function () {
+    const highHand = new OnePair(
+      [{ rank: CardRank._4, suit: 'd' }, { rank: CardRank._4, suit: 'h' }, { rank: CardRank.A, suit: 'h' }, { rank: CardRank.J, suit: 'c' }, { rank: CardRank.T, suit: 's' }, { rank: CardRank._7, suit: 's' }, { rank: CardRank._8, suit: 'd' }],
+      gameForTest
+    );
+    const lowHand = new OnePair(
+      [{ rank: CardRank._4, suit: 'd' }, { rank: CardRank._4, suit: 'h' }, { rank: CardRank.A, suit: 'c' }, { rank: CardRank.T, suit: 'c' }, { rank: CardRank._9, suit: 's' }, { rank: CardRank._7, suit: 'c' }, { rank: CardRank._8, suit: 'd' }],
+      gameForTest
+    );
+    lowHand.loseTo(highHand).should.equal(true);
+    highHand.loseTo(lowHand).should.equal(false);
+  });
+});
+
+describe('Building hands from 7 cards', function () {
+  it('should return best hand as Two Pair', function () {
+    const hand = Hand.solve([{ rank: CardRank._8, suit: 'd' }, { rank: CardRank._8, suit: 's' }, { rank: CardRank._4, suit: 's' }, { rank: CardRank._5, suit: 'c' }, { rank: CardRank.Q, suit: 'd' }, { rank: CardRank._5, suit: 'd' }, { rank: CardRank.Q, suit: 'h' }], gameForTest);
+    hand.name.should.equal('Two Pair');
+  });
+  it('should detect the best hand string (#1)', function () {
+    const hand = Hand.solve([{ rank: CardRank._8, suit: 'd' }, { rank: CardRank._8, suit: 's' }, { rank: CardRank._4, suit: 's' }, { rank: CardRank._5, suit: 'c' }, { rank: CardRank.Q, suit: 'd' }, { rank: CardRank._5, suit: 'd' }, { rank: CardRank.Q, suit: 'h' }], gameForTest);
+    hand.toString().should.equal('Qd, Qh, 8d, 8s, 5c');
+  });
+  it('should detect the best hand string (#2)', function () {
+    const hand = Hand.solve([{ rank: CardRank._4, suit: 's' }, { rank: CardRank._4, suit: 'h' }, { rank: CardRank.A, suit: 'h' }, { rank: CardRank.J, suit: 'c' }, { rank: CardRank.T, suit: 's' }, { rank: CardRank._7, suit: 's' }, { rank: CardRank._8, suit: 'd' }], gameForTest);
+    hand.toString().should.equal('4s, 4h, Ah, Jc, 10s');
+  });
+});
+
+describe('Building hands from 5 cards', function () {
+  it('should return best hand as Two Pair', function () {
+    const hand = Hand.solve([{ rank: CardRank._8, suit: 'd' }, { rank: CardRank._8, suit: 's' }, { rank: CardRank.Q, suit: 'd' }, { rank: CardRank.A, suit: 'd' }, { rank: CardRank.Q, suit: 'h' }], gameForTest);
+    hand.name.should.equal('Two Pair');
+  });
+});
+
+describe('Determining winning hands', function () {
+  it('should detect the winning hand from a list', function () {
+    const h1 = Hand.solve([{ rank: CardRank._2, suit: 's' }, { rank: CardRank._3, suit: 's' }, { rank: CardRank._4, suit: 'h' }, { rank: CardRank._5, suit: 'c' }, { rank: CardRank.A, suit: 's' }, { rank: CardRank.T, suit: 's' }, { rank: CardRank._8, suit: 'd' }], gameForTest);
+    const h2 = Hand.solve([{ rank: CardRank._5, suit: 's' }, { rank: CardRank.T, suit: 'd' }, { rank: CardRank._3, suit: 'h' }, { rank: CardRank.A, suit: 'c' }, { rank: CardRank._2, suit: 's' }, { rank: CardRank.T, suit: 's' }, { rank: CardRank._8, suit: 'd' }], gameForTest);
+    const h3 = Hand.solve([{ rank: CardRank._5, suit: 's' }, { rank: CardRank._5, suit: 'h' }, { rank: CardRank._3, suit: 's' }, { rank: CardRank._3, suit: 'c' }, { rank: CardRank._2, suit: 's' }, { rank: CardRank.T, suit: 's' }, { rank: CardRank._3, suit: 'd' }], gameForTest);
+    const winners = Hand.winners([h1, h2, h3]);
+    winners.length.should.equal(1);
+    winners[0].should.equal(h3);
+  });
+  it('should detect the winning hands from a list', function () {
+    const h1 = Hand.solve([{ rank: CardRank._2, suit: 's' }, { rank: CardRank._3, suit: 's' }, { rank: CardRank._4, suit: 'h' }, { rank: CardRank._5, suit: 'c' }, { rank: CardRank.A, suit: 's' }, { rank: CardRank.T, suit: 's' }, { rank: CardRank._8, suit: 'd' }], gameForTest);
+    const h2 = Hand.solve([{ rank: CardRank._2, suit: 'h' }, { rank: CardRank._3, suit: 'h' }, { rank: CardRank._4, suit: 'd' }, { rank: CardRank._5, suit: 'd' }, { rank: CardRank.A, suit: 'h' }, { rank: CardRank.T, suit: 'c' }, { rank: CardRank._8, suit: 'c' }], gameForTest);
+    const h3 = Hand.solve([{ rank: CardRank._5, suit: 's' }, { rank: CardRank.T, suit: 's' }, { rank: CardRank._3, suit: 'h' }, { rank: CardRank.A, suit: 'c' }, { rank: CardRank._2, suit: 's' }, { rank: CardRank.T, suit: 'c' }, { rank: CardRank._8, suit: 'd' }], gameForTest);
+    const winners = Hand.winners([h1, h2, h3]);
+    winners.length.should.equal(2);
+    (winners.indexOf(h1) >= 0).should.equal(true);
+    (winners.indexOf(h2) >= 0).should.equal(true);
+  });
+});

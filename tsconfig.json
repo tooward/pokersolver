@@ -9,7 +9,7 @@
     },
     "include": [
         "*.ts"
-    ],
+, "pokersolver.ts.modified"    ],
     "exclude": [
         "node_modules"
     ]

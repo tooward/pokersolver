@@ -128,6 +128,9 @@ Useful for Pai Gow Poker's Low Hand. One joker in the deck as `'Or'`; it is coun
 ```
 npm install
 npm test
+
+To run only the standard tests:
+npx mocha -r ts-node/register test/standard.ts
 ```
 
 ## License

@@ -1,22 +1,7 @@
 declare var exports: any;
 
 // NOTE: The 'joker' will be denoted with a value of 'O' and any suit.
-  export const values: string[] = [
-    "1",
-    "2",
-    "3",
-    "4",
-    "5",
-    "6",
-    "7",
-    "8",
-    "9",
-    "T",
-    "J",
-    "Q",
-    "K",
-    "A",
-  ];
+  export enum CardRank { _2, _3, _4, _5, _6, _7, _8, _9, T, J, Q, K, A }
 
   // --------------------------
   // Card class
@@ -30,7 +15,7 @@ declare var exports: any;
     constructor(str: string) {
       this.value = str.substr(0, 1);
       this.suit = str.substr(1, 1).toLowerCase();
-      this.rank = values.indexOf(this.value);
+      this.rank = CardRank[this.value as keyof typeof CardRank];
       this.wildValue = str.substr(0, 1);
     }
 
@@ -174,11 +159,11 @@ declare var exports: any;
         } else if (cards) {
           if (
             this.game.wildStatus === 1 ||
-            cards[0].rank === values.length - 1
+            cards[0].rank === this.values.length - 1
           ) {
             checkCardsLength += 1;
           }
-        } else if (this.game.wildStatus === 1 || val === values.length - 1) {
+        } else if (this.game.wildStatus === 1 || val === this.values.length - 1) {
           checkCardsLength += 1;
         }
       }
@@ -192,15 +177,15 @@ declare var exports: any;
         let wild = this.wilds[i];
         if (setRanks) {
           let j = 0;
-          while (j < values.length && j < cards.length) {
-            if (cards[j].rank === values.length - 1 - j) {
+          while (j < this.values.length && j < cards.length) {
+            if (cards[j].rank === this.values.length - 1 - j) {
               j++;
             } else {
               break;
             }
           }
-          wild.rank = values.length - 1 - j;
-          wild.wildValue = values[wild.rank];
+          wild.rank = this.values.length - 1 - j;
+          wild.wildValue = this.values[wild.rank][0].value;
         }
         cards.push(wild);
         cards = cards.sort(Card.sort);
@@ -224,7 +209,7 @@ declare var exports: any;
           let card = picks[i];
           if (card.rank === -1) {
             card.wildValue = "A";
-            card.rank = values.length - 1;
+            card.rank =this.values.length - 1;
           }
         }
         picks = picks.sort(Card.sort);
@@ -426,9 +411,9 @@ declare var exports: any;
             if (this.cards && this.cards[0]) {
               wild.rank = this.cards[0].rank;
             } else {
-              wild.rank = values.length - 1;
+              wild.rank =this.values.length - 1;
             }
-            wild.wildValue = values[wild.rank];
+            wild.wildValue = this.values[wild.rank][0].value;
             this.cards.push(wild);
           }
           this.cards = this.cards.concat(
@@ -468,9 +453,9 @@ declare var exports: any;
             if (this.cards && this.cards[0]) {
               wild.rank = this.cards[0].rank;
             } else {
-              wild.rank = values.length - 1;
+              wild.rank =this.values.length - 1;
             }
-            wild.wildValue = values[wild.rank];
+            wild.wildValue = this.values[wild.rank][0].value;
             this.cards.push(wild);
           }
           break;
@@ -493,14 +478,14 @@ declare var exports: any;
               if (cardsArr && cardsArr[0]) {
                 wild.rank = cardsArr[0].rank;
               } else if (
-                this.cards[0].rank === values.length - 1 &&
+                this.cards[0].rank ===this.values.length - 1 &&
                 this.game.wildStatus === 1
               ) {
-                wild.rank = values.length - 2;
+                wild.rank =this.values.length - 2;
               } else {
-                wild.rank = values.length - 1;
+                wild.rank =this.values.length - 1;
               }
-              wild.wildValue = values[wild.rank];
+              wild.wildValue = this.values[wild.rank][0].value;
               this.cards.push(wild);
             }
             this.cards = this.cards.concat(
@@ -543,9 +528,9 @@ declare var exports: any;
             if (this.cards && this.cards[0]) {
               wild.rank = this.cards[0].rank;
             } else {
-              wild.rank = values.length - 1;
+              wild.rank =this.values.length - 1;
             }
-            wild.wildValue = values[wild.rank];
+            wild.wildValue = this.values[wild.rank][0].value;
             this.cards.push(wild);
           }
           this.cards = this.cards.concat(
@@ -609,9 +594,9 @@ declare var exports: any;
             if (this.cards && this.cards[0]) {
               wild.rank = this.cards[0].rank;
             } else {
-              wild.rank = values.length - 1;
+              wild.rank =this.values.length - 1;
             }
-            wild.wildValue = values[wild.rank];
+            wild.wildValue = this.values[wild.rank][0].value;
             this.cards.push(wild);
           }
           break;
@@ -631,14 +616,14 @@ declare var exports: any;
               if (cardsArr && cardsArr[0]) {
                 wild.rank = cardsArr[0].rank;
               } else if (
-                this.cards[0].rank === values.length - 1 &&
+                this.cards[0].rank ===this.values.length - 1 &&
                 this.game.wildStatus === 1
               ) {
-                wild.rank = values.length - 2;
+                wild.rank =this.values.length - 2;
               } else {
-                wild.rank = values.length - 1;
+                wild.rank =this.values.length - 1;
               }
-              wild.wildValue = values[wild.rank];
+              wild.wildValue = this.values[wild.rank][0].value;
               this.cards.push(wild);
             }
             this.cards = this.cards.concat(
@@ -653,14 +638,14 @@ declare var exports: any;
               if (cardsArr && cardsArr[0]) {
                 wild.rank = cardsArr[0].rank;
               } else if (
-                this.cards[0].rank === values.length - 1 &&
+                this.cards[0].rank ===this.values.length - 1 &&
                 this.game.wildStatus === 1
               ) {
-                wild.rank = values.length - 2;
+                wild.rank =this.values.length - 2;
               } else {
-                wild.rank = values.length - 1;
+                wild.rank =this.values.length - 1;
               }
-              wild.wildValue = values[wild.rank];
+              wild.wildValue = this.values[wild.rank][0].value;
               this.cards.push(wild);
             }
           }
@@ -699,9 +684,9 @@ declare var exports: any;
             if (this.cards && this.cards[0]) {
               wild.rank = this.cards[0].rank;
             } else {
-              wild.rank = values.length - 1;
+              wild.rank =this.values.length - 1;
             }
-            wild.wildValue = values[wild.rank];
+            wild.wildValue = this.values[wild.rank][0].value;
             this.cards.push(wild);
           }
           break;
@@ -721,14 +706,14 @@ declare var exports: any;
               if (cardsArr && cardsArr[0]) {
                 wild.rank = cardsArr[0].rank;
               } else if (
-                this.cards[0].rank === values.length - 1 &&
+                this.cards[0].rank ===this.values.length - 1 &&
                 this.game.wildStatus === 1
               ) {
-                wild.rank = values.length - 2;
+                wild.rank =this.values.length - 2;
               } else {
-                wild.rank = values.length - 1;
+                wild.rank =this.values.length - 1;
               }
-              wild.wildValue = values[wild.rank];
+              wild.wildValue = this.values[wild.rank][0].value;
               this.cards.push(wild);
             }
             this.cards = this.cards.concat(
@@ -804,7 +789,7 @@ declare var exports: any;
               wildCount++;
             }
             if (card.rank === 0) {
-              card.rank = values.indexOf("A");
+              card.rank = CardRank.A;
               card.wildValue = "A";
               if (card.value === "1") {
                 card.value = "A";
@@ -814,7 +799,7 @@ declare var exports: any;
           this.cards = this.cards.sort(Card.sort);
           for (; wildCount < this.wilds.length && this.cards.length < this.game.cardsInHand; wildCount++) {
             card = this.wilds[wildCount];
-            card.rank = values.indexOf("A");
+            card.rank = CardRank.A;
             card.wildValue = "A";
             this.cards.push(card);
           }
@@ -841,20 +826,20 @@ declare var exports: any;
         card = this.wilds[i];
         checkCards = this.getGaps(this.cards.length);
         if (this.cards.length === checkCards.length) {
-          if (this.cards[0].rank < values.length - 1) {
+          if (this.cards[0].rank < this.values.length - 1) {
             card.rank = this.cards[0].rank + 1;
-            card.wildValue = values[card.rank];
+            card.wildValue = this.values[card.rank][0].value;
             this.cards.push(card);
           } else {
             card.rank = this.cards[this.cards.length - 1].rank - 1;
-            card.wildValue = values[card.rank];
+            card.wildValue = this.values[card.rank][0].value;;
             this.cards.push(card);
           }
         } else {
           for (let j = 1; j < this.cards.length; j++) {
             if (this.cards[j - 1].rank - this.cards[j].rank > 1) {
               card.rank = this.cards[j - 1].rank - 1;
-              card.wildValue = values[card.rank];
+              card.wildValue = this.values[card.rank][0].value;;
               this.cards.push(card);
               break;
             }
@@ -914,7 +899,7 @@ declare var exports: any;
         checkHandLength = this.game.sfQualify;
       }
 
-      for (let i = values.length; i > 0; i--) {
+      for (let i = this.values.length; i > 0; i--) {
         cardsList = [];
         gapCount = 0;
         for (let j = 0; j < cardsToCheck.length; j++) {
@@ -973,7 +958,7 @@ declare var exports: any;
         if (!cardFound) {
           if (wildCount < wildCards.length) {
             wildCards[wildCount].rank = i;
-            wildCards[wildCount].wildValue = values[i];
+            wildCards[wildCount].wildValue = this.values[i][0].value;
             wheelCards.push(wildCards[wildCount]);
             wildCount++;
           } else {
@@ -1001,14 +986,14 @@ declare var exports: any;
             if (cardsArr && cardsArr[0]) {
               wild.rank = cardsArr[0].rank;
             } else if (
-              this.cards[0].rank === values.length - 1 &&
+              this.cards[0].rank === this.values.length - 1 &&
               this.game.wildStatus === 1
             ) {
-              wild.rank = values.length - 2;
+              wild.rank = this.values.length - 2;
             } else {
-              wild.rank = values.length - 1;
+              wild.rank = this.values.length - 1;
             }
-            wild.wildValue = values[wild.rank];
+            wild.wildValue = this.values[wild.rank][0].value;;
             this.cards.push(wild);
           }
           this.cards = this.cards.concat(
@@ -1023,14 +1008,14 @@ declare var exports: any;
             if (cardsArr && cardsArr[0]) {
               wild.rank = cardsArr[0].rank;
             } else if (
-              this.cards[0].rank === values.length - 1 &&
+              this.cards[0].rank === this.values.length - 1 &&
               this.game.wildStatus === 1
             ) {
-              wild.rank = values.length - 2;
+              wild.rank = this.values.length - 2;
             } else {
-              wild.rank = values.length - 1;
+              wild.rank = this.values.length - 1;
             }
-            wild.wildValue = values[wild.rank];
+            wild.wildValue = this.values[wild.rank][0].value;;
             this.cards.push(wild);
           }
         }
@@ -1065,9 +1050,9 @@ declare var exports: any;
             if (this.cards && this.cards[0]) {
               wild.rank = this.cards[0].rank;
             } else {
-              wild.rank = values.length - 1;
+              wild.rank = this.values.length - 1;
             }
-            wild.wildValue = values[wild.rank];
+            wild.wildValue = this.values[wild.rank][0].value;;
             this.cards.push(wild);
           }
           this.cards = this.cards.concat(
@@ -1106,14 +1091,14 @@ declare var exports: any;
             if (cardsArr && cardsArr[0]) {
               wild.rank = cardsArr[0].rank;
             } else if (
-              this.cards[0].rank === values.length - 1 &&
+              this.cards[0].rank === this.values.length - 1 &&
               this.game.wildStatus === 1
             ) {
-              wild.rank = values.length - 2;
+              wild.rank = this.values.length - 2;
             } else {
-              wild.rank = values.length - 1;
+              wild.rank = this.values.length - 1;
             }
-            wild.wildValue = values[wild.rank];
+            wild.wildValue = this.values[wild.rank][0].value;;
             this.cards.push(wild);
           }
           this.cards = this.cards.concat(
@@ -1128,14 +1113,14 @@ declare var exports: any;
             if (cardsArr && cardsArr[0]) {
               wild.rank = cardsArr[0].rank;
             } else if (
-              this.cards[0].rank === values.length - 1 &&
+              this.cards[0].rank === this.values.length - 1 &&
               this.game.wildStatus === 1
             ) {
-              wild.rank = values.length - 2;
+              wild.rank = this.values.length - 2;
             } else {
-              wild.rank = values.length - 1;
+              wild.rank = this.values.length - 1;
             }
-            wild.wildValue = values[wild.rank];
+            wild.wildValue = this.values[wild.rank][0].value;;
             this.cards.push(wild);
           }
         }
@@ -1170,14 +1155,14 @@ declare var exports: any;
             if (cardsArr && cardsArr[0]) {
               wild.rank = cardsArr[0].rank;
             } else if (
-              this.cards[0].rank === values.length - 1 &&
+              this.cards[0].rank === this.values.length - 1 &&
               this.game.wildStatus === 1
             ) {
-              wild.rank = values.length - 2;
+              wild.rank = this.values.length - 2;
             } else {
-              wild.rank = values.length - 1;
+              wild.rank = this.values.length - 1;
             }
-            wild.wildValue = values[wild.rank];
+            wild.wildValue = this.values[wild.rank][0].value;;
             this.cards.push(wild);
           }
           this.cards = this.cards.concat(
@@ -1192,14 +1177,14 @@ declare var exports: any;
             if (cardsArr && cardsArr[0]) {
               wild.rank = cardsArr[0].rank;
             } else if (
-              this.cards[0].rank === values.length - 1 &&
+              this.cards[0].rank === this.values.length - 1 &&
               this.game.wildStatus === 1
             ) {
-              wild.rank = values.length - 2;
+              wild.rank = this.values.length - 2;
             } else {
-              wild.rank = values.length - 1;
+              wild.rank = this.values.length - 1;
             }
-            wild.wildValue = values[wild.rank];
+            wild.wildValue = this.values[wild.rank][0].value;;
             this.cards.push(wild);
           }
         }
@@ -1237,9 +1222,9 @@ declare var exports: any;
             if (this.cards && this.cards[0]) {
               wild.rank = this.cards[0].rank;
             } else {
-              wild.rank = values.length - 1;
+              wild.rank = this.values.length - 1;
             }
-            wild.wildValue = values[wild.rank];
+            wild.wildValue = this.values[wild.rank][0].value;;
             this.cards.push(wild);
           }
           this.cards = this.cards.concat(
@@ -1272,7 +1257,7 @@ declare var exports: any;
         const card = this.cards[i];
         if (card.value === this.game.wildValue) {
           card.wildValue = "A";
-          card.rank = values.indexOf("A");
+          card.rank = CardRank.A;
         }
       }
       if (this.game.noKickers) {
@@ -1687,8 +1672,8 @@ declare var exports: any;
           }
         } else if (altGame.handValues[altRank] === OnePair) {
           if (
-            altHand.cards[0].rank >= values.indexOf("T") &&
-            altHand.cards[0].rank <= values.indexOf("K") &&
+            altHand.cards[0].rank >= CardRank.T &&
+            altHand.cards[0].rank <= CardRank.K &&
             altHand.cards[2].wildValue === "A"
           ) {
             let possibleSF = altHand.cards.slice(0, 2);
