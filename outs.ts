@@ -1,22 +1,22 @@
 // Import the Hand class from your handsolver file as HandSolver.
-import { Card, Hand, Game  } from 'tooward-pokersolver'
+import { Card, values } from './pokersolver';
 
 // Define card values in ascending order (same as in pokersolver)
-const values = {
-    '2': 0,
-    '3': 1,
-    '4': 2,
-    '5': 3,
-    '6': 4,
-    '7': 5,
-    '8': 6,
-    '9': 7,
-    'T': 8,
-    'J': 9,
-    'Q': 10,
-    'K': 11,
-    'A': 12
-  };
+// const values = {
+//     '2': 0,
+//     '3': 1,
+//     '4': 2,
+//     '5': 3,
+//     '6': 4,
+//     '7': 5,
+//     '8': 6,
+//     '9': 7,
+//     'T': 8,
+//     'J': 9,
+//     'Q': 10,
+//     'K': 11,
+//     'A': 12
+//   };
 
 /**
  * Represents the output of an outs calculation
@@ -137,6 +137,80 @@ export default class HandEvaluator {
         
         return false;
       }
+      
+  /**
+   * Evaluates the outs for making two pair.
+   * The function takes two arrays of cards: the player's hole cards (2 cards) and the community cards (3–5 cards).
+   * It assumes that the full hand (hole + community) is not already two pair (or better) and only evaluates a one-pair hand.
+   *
+   * The result Out object indicates:
+   *  - possibleHand: whether the two pair is possible,
+   *  - outHand: the expected hand type ("Two Pair"),
+   *  - cardNeededCount: total number of cards that can complete the two pair,
+   *  - cardsNeeded: the specific outs (as Card objects).
+   *
+   * @param holeCards - two Card objects representing the player's hole cards
+   * @param communityCards - 3 to 5 Card objects representing the community cards
+   * @returns Out object with the outs details.
+   */
+    static outsToTwoPair(holeCards: Card[], communityCards: Card[]): Out {
+        const out = new Out();
+        out.outHand = "Two Pair"; 
+        out.possibleHand = false;
+
+        if (!holeCards || holeCards.length !== 2) {
+        throw new Error("Must provide exactly two hole cards");
+        }
+        if (!communityCards || communityCards.length < 3 || communityCards.length > 5) {
+        throw new Error("Community cards must be between 3 and 5");
+        }
+
+        // Combine hole and community cards
+        const allCards: Card[] = [...holeCards, ...communityCards];
+
+        // Only evaluate if there is at least one pair in the full hand.
+        if (!this.checkForPair(allCards)) {
+        return out;
+        }
+
+        // Identify one pair – pick the first encountered pair by value.
+        const rankCount: { [val: string]: number } = {};
+        for (const card of allCards) {
+        rankCount[card.value] = (rankCount[card.value] || 0) + 1;
+        }
+        let pairValue: string | null = null;
+        for (const value in rankCount) {
+        if (rankCount[value] >= 2) {
+            pairValue = value;
+            break;
+        }
+        }
+        if (!pairValue) return out;
+
+        // Create a sorted copy of the full hand (descending by rank)
+        const sortedCards = allCards.slice().sort(Card.sort);
+        // Select the highest card not in the pair.
+        const nonPairCards = sortedCards.filter(card => card.value !== pairValue);
+        if (nonPairCards.length === 0) return out;
+        const highestCard = nonPairCards[0];
+
+        // For that highest card, determine which suits are missing.
+        // All four suits: s,h,d,c.
+        const allSuits = ['s', 'h', 'd', 'c'];
+        // Determine which suits for highestCard.value are already in play.
+        const presentSuits = new Set(allCards.filter(card => card.value === highestCard.value).map(card => card.suit));
+        const missingSuits = allSuits.filter(suit => !presentSuits.has(suit));
+
+        if (missingSuits.length > 0) {
+        out.possibleHand = true;
+        out.cardNeededCount = missingSuits.length;
+        for (const suit of missingSuits) {
+            // Create a new Card from the highest card's value and the missing suit.
+            out.cardsNeeded.push(new Card(highestCard.value + suit));
+        }
+        }
+        return out;
+    }
 
     /**
      * Checks for an inside straight draw (four cards that could make a straight with one card in the middle)
@@ -147,64 +221,73 @@ export default class HandEvaluator {
     static checkForInsideStraightDraw(cards: Card[]): Out {
         const out: Out = new Out();
         out.outHand = "Inside Straight Draw";
-
+      
         if (!cards || cards.length < 4) {
-            throw new Error("At least four cards are required to check for an inside straight draw");
+          throw new Error("At least four cards are required to check for an inside straight draw");
         }
-
-        // Sort cards by rank
-        const sortedCards = [...cards].sort((a, b) => values[a.value] - values[b.value]);
-
-        // Extract unique ranks
-        const rankValues = Array.from(new Set(sortedCards.map(card => values[card.value])));
-
-        // If we have an Ace, handle it specially
-        if (rankValues.includes(values['A'])) {
-            const aceLowRanks = [...rankValues.filter(r => r !== values['A']), -1].sort((a, b) => a - b);
-
-            for (let i = 0; i <= aceLowRanks.length - 4; i++) {
-                const subRanks = aceLowRanks.slice(i, i + 4);
-                const min = Math.min(...subRanks);
-                const max = Math.max(...subRanks);
-
-                if (max - min === 4 && subRanks.length === 4) {
-                    out.possibleHand = true;
-                    out.cardsNeeded = this.findMissingCards(subRanks, sortedCards);
-                    out.cardNeededCount = out.cardsNeeded.length;
-                    return out;
-                }
-
-                if (min === -1 && subRanks.includes(0) && subRanks.includes(1) && subRanks.includes(2)) {
-                    out.possibleHand = true;
-                    out.cardsNeeded = this.findMissingCards(subRanks, sortedCards);
-                    out.cardNeededCount = out.cardsNeeded.length;
-                    return out;
-                }
-
-                if (min === 0 && max === 3 && subRanks.length === 4) {
-                    out.possibleHand = true;
-                    out.cardsNeeded = this.findMissingCards(subRanks, sortedCards);
-                    out.cardNeededCount = out.cardsNeeded.length;
-                    return out;
-                }
-            }
-        }
-
-        for (let i = 0; i <= rankValues.length - 4; i++) {
-            const subRanks = rankValues.slice(i, i + 4);
+      
+        // Use the imported values if available, otherwise fallback to a default array.
+        const cardValues = (Array.isArray(values) && values.length > 0)
+          ? values
+          : ['1','2','3','4','5','6','7','8','9','T','J','Q','K','A'];
+      
+        // Sort cards by rank (using cardValues order)
+        const sortedCards = [...cards].sort((a, b) => cardValues.indexOf(a.value) - cardValues.indexOf(b.value));
+        // Extract unique ranks (as numeric indices)
+        const rankValues = Array.from(new Set(sortedCards.map(card => cardValues.indexOf(card.value))));
+      
+        // If we have an Ace, handle it specially by treating Ace as low (represented by -1)
+        if (rankValues.includes(cardValues.indexOf('A'))) {
+          const aceLowRanks = [...rankValues.filter(r => r !== cardValues.indexOf('A')), -1].sort((a, b) => a - b);
+      
+          for (let i = 0; i <= aceLowRanks.length - 4; i++) {
+            const subRanks = aceLowRanks.slice(i, i + 4);
             const min = Math.min(...subRanks);
             const max = Math.max(...subRanks);
-
+      
+            // Standard inside straight draw check
             if (max - min === 4 && subRanks.length === 4) {
-                out.possibleHand = true;
-                out.cardsNeeded = this.findMissingCards(subRanks, sortedCards);
-                out.cardNeededCount = out.cardsNeeded.length;
-                return out;
+              out.possibleHand = true;
+              out.cardsNeeded = this.findMissingCards(subRanks, sortedCards);
+              out.cardNeededCount = out.cardsNeeded.length;
+              return out;
             }
+      
+            // Special check when Ace is low: if -1 is present and we have 0, 1, and 2 in the sequence,
+            // then the missing needed card would complete the series.
+            if (min === -1 && subRanks.includes(0) && subRanks.includes(1) && subRanks.includes(2)) {
+              out.possibleHand = true;
+              out.cardsNeeded = this.findMissingCards(subRanks, sortedCards);
+              out.cardNeededCount = out.cardsNeeded.length;
+              return out;
+            }
+      
+            // Optional: if the sequence starts from 0 and ends at 3 (i.e. 0,1,2,3) it’s another valid configuration.
+            if (min === 0 && max === 3 && subRanks.length === 4) {
+              out.possibleHand = true;
+              out.cardsNeeded = this.findMissingCards(subRanks, sortedCards);
+              out.cardNeededCount = out.cardsNeeded.length;
+              return out;
+            }
+          }
         }
-
+      
+        // Process non-Ace-low sequences. Iterate through unique rankValues in order.
+        for (let i = 0; i <= rankValues.length - 4; i++) {
+          const subRanks = rankValues.slice(i, i + 4);
+          const min = Math.min(...subRanks);
+          const max = Math.max(...subRanks);
+      
+          if (max - min === 4 && subRanks.length === 4) {
+            out.possibleHand = true;
+            out.cardsNeeded = this.findMissingCards(subRanks, sortedCards);
+            out.cardNeededCount = out.cardsNeeded.length;
+            return out;
+          }
+        }
+      
         return out;
-    }
+      }
 
     // Helper method to find missing cards for an inside straight draw
     private static findMissingCards(subRanks: number[], sortedCards: Card[]): Card[] {
@@ -213,26 +296,51 @@ export default class HandEvaluator {
         
         // Create a set of cards that are already in play (as strings for easy comparison)
         const existingCards = new Set(sortedCards.map(card => card.value + card.suit));
-
+        
+        // Use the imported values if available, otherwise fallback to a default array.
+        const cardValues = (Array.isArray(values) && values.length > 0)
+        ? values
+        : ['1','2','3','4','5','6','7','8','9','T','J','Q','K','A'];
+        
+        // Iterate through the range of ranks in the subRanks sequence
         for (let rank = Math.min(...subRanks); rank <= Math.max(...subRanks); rank++) {
             if (!subRanks.includes(rank)) {
-                // Found a missing rank in the sequence
+                // Missing rank found in the sequence; determine its card value.
+                // Here, if rank === -1 we treat it as Ace (for Ace-low straight)
+                const cardVal = (rank === -1) ? 'A' : cardValues[rank];
+                
+                // For each suit, if that card is not already in play, add it as a missing card.
                 for (const suit of suits) {
-                    // Find the card value string for this rank
-                    const cardValue = Object.keys(values).find(key => values[key] === rank) || 
-                                    (rank === -1 ? 'A' : rank.toString()); // Handle special case for Ace-low
-                    
-                    // Create card string for checking if it exists
-                    const cardString = cardValue + suit;
-                    
-                    // Only add if card is not already in play
-                    if (cardValue && !existingCards.has(cardString)) {
-                        missingCards.push(new Card(cardString));
-                    }
+                const cardString = cardVal + suit;
+                if (!existingCards.has(cardString)) {
+                    missingCards.push(new Card(cardString));
+                }
                 }
             }
         }
-
+        
         return missingCards;
     }
 }
+
+/*
+I'd like to convert this Swift function to TypeScript. The functions purpose is to evaluate a hand and retrun back the outs the hand can make two pair. It should only evaluate the hand for two pairs with the assumption that the hand is not a two pair already. These hands are Texas Hold'em poker hands. 
+
+The function should take two array's of Cards as inputs: holeCards and communityCards. The holeCards array will always have two cards and the communityCards array will have between 3 and 5 cards.
+
+It should return a n Out object as the result which is defined in the out.ts file. The resulting out object should indicate if the two pair is possible via the possibleHand boolean, indicate the hand type using the pokersolver.ts hand types as a string value, indicate the number of cards needed for the out in total (which is the number of cards that can make the out) and the specific cards that form the outs in the cardsNeeded array. The hand types are listed in the handValues array for the standard gameRules, and is listed below also.
+
+Please also create a set of unit tests for this function. The unit tests should evaluate all conditions for a hand that can be evaluated for outs that make two pair. The unit tests should be written in the standard Chai + Mocha format.
+
+          handValues: [
+            StraightFlush,
+            FourOfAKind,
+            FullHouse,
+            Flush,
+            Straight,
+            ThreeOfAKind,
+            TwoPair,
+            OnePair,
+            HighCard,
+          ],
+*/

@@ -131,6 +131,9 @@ npm test
 
 To run only the standard tests:
 npx mocha -r ts-node/register test/standard.ts
+
+To run only out tests:
+npx mocha --require ts-node/register test/testouts.ts
 ```
 
 ## License

@@ -1,8 +1,13 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.PaiGowPokerHelper = exports.Game = exports.HighCard = exports.OnePair = exports.TwoPair = exports.ThreePair = exports.ThreeOfAKind = exports.TwoThreeOfAKind = exports.Straight = exports.Flush = exports.FullHouse = exports.ThreeOfAKindTwoPair = exports.FourWilds = exports.FourOfAKind = exports.FourOfAKindPairPlus = exports.FiveOfAKind = exports.WildRoyalFlush = exports.NaturalRoyalFlush = exports.RoyalFlush = exports.StraightFlush = exports.Hand = exports.Card = void 0;
+exports.PaiGowPokerHelper = exports.Game = exports.HighCard = exports.OnePair = exports.TwoPair = exports.ThreePair = exports.ThreeOfAKind = exports.TwoThreeOfAKind = exports.Straight = exports.Flush = exports.FullHouse = exports.ThreeOfAKindTwoPair = exports.FourWilds = exports.FourOfAKind = exports.FourOfAKindPairPlus = exports.FiveOfAKind = exports.WildRoyalFlush = exports.NaturalRoyalFlush = exports.RoyalFlush = exports.StraightFlush = exports.Hand = exports.Card = exports.values = exports.HandEvaluator = void 0;
+var outs_1 = require("./outs");
+Object.defineProperty(exports, "HandEvaluator", { enumerable: true, get: function () { return __importDefault(outs_1).default; } });
 // NOTE: The 'joker' will be denoted with a value of 'O' and any suit.
-const values = [
+exports.values = [
     "1",
     "2",
     "3",
@@ -25,7 +30,7 @@ class Card {
     constructor(str) {
         this.value = str.substr(0, 1);
         this.suit = str.substr(1, 1).toLowerCase();
-        this.rank = values.indexOf(this.value);
+        this.rank = exports.values.indexOf(this.value);
         this.wildValue = str.substr(0, 1);
     }
     toString() {
@@ -141,11 +146,11 @@ class Hand {
             }
             else if (cards) {
                 if (this.game.wildStatus === 1 ||
-                    cards[0].rank === values.length - 1) {
+                    cards[0].rank === exports.values.length - 1) {
                     checkCardsLength += 1;
                 }
             }
-            else if (this.game.wildStatus === 1 || val === values.length - 1) {
+            else if (this.game.wildStatus === 1 || val === exports.values.length - 1) {
                 checkCardsLength += 1;
             }
         }
@@ -157,16 +162,16 @@ class Hand {
             let wild = this.wilds[i];
             if (setRanks) {
                 let j = 0;
-                while (j < values.length && j < cards.length) {
-                    if (cards[j].rank === values.length - 1 - j) {
+                while (j < exports.values.length && j < cards.length) {
+                    if (cards[j].rank === exports.values.length - 1 - j) {
                         j++;
                     }
                     else {
                         break;
                     }
                 }
-                wild.rank = values.length - 1 - j;
-                wild.wildValue = values[wild.rank];
+                wild.rank = exports.values.length - 1 - j;
+                wild.wildValue = exports.values[wild.rank];
             }
             cards.push(wild);
             cards = cards.sort(Card.sort);
@@ -187,7 +192,7 @@ class Hand {
                 let card = picks[i];
                 if (card.rank === -1) {
                     card.wildValue = "A";
-                    card.rank = values.length - 1;
+                    card.rank = exports.values.length - 1;
                 }
             }
             picks = picks.sort(Card.sort);
@@ -255,7 +260,7 @@ exports.Hand = Hand;
 // Subclasses of Hand
 // --------------------------
 class StraightFlush extends Hand {
-    constructor(cards, game, canDisqualify) {
+    constructor(cards, game, canDisqualify = false) {
         super(cards, "Straight Flush", game, canDisqualify);
     }
     solve() {
@@ -302,7 +307,7 @@ class StraightFlush extends Hand {
 }
 exports.StraightFlush = StraightFlush;
 class RoyalFlush extends StraightFlush {
-    constructor(cards, game, canDisqualify) {
+    constructor(cards, game, canDisqualify = false) {
         super(cards, game, canDisqualify);
     }
     solve() {
@@ -313,7 +318,7 @@ class RoyalFlush extends StraightFlush {
 }
 exports.RoyalFlush = RoyalFlush;
 class NaturalRoyalFlush extends RoyalFlush {
-    constructor(cards, game, canDisqualify) {
+    constructor(cards, game, canDisqualify = false) {
         super(cards, game, canDisqualify);
     }
     solve() {
@@ -337,7 +342,7 @@ class NaturalRoyalFlush extends RoyalFlush {
 }
 exports.NaturalRoyalFlush = NaturalRoyalFlush;
 class WildRoyalFlush extends RoyalFlush {
-    constructor(cards, game, canDisqualify) {
+    constructor(cards, game, canDisqualify = false) {
         super(cards, game, canDisqualify);
     }
     solve() {
@@ -361,7 +366,7 @@ class WildRoyalFlush extends RoyalFlush {
 }
 exports.WildRoyalFlush = WildRoyalFlush;
 class FiveOfAKind extends Hand {
-    constructor(cards, game, canDisqualify) {
+    constructor(cards, game, canDisqualify = false) {
         super(cards, "Five of a Kind", game, canDisqualify);
     }
     solve() {
@@ -375,9 +380,9 @@ class FiveOfAKind extends Hand {
                         wild.rank = this.cards[0].rank;
                     }
                     else {
-                        wild.rank = values.length - 1;
+                        wild.rank = exports.values.length - 1;
                     }
-                    wild.wildValue = values[wild.rank];
+                    wild.wildValue = exports.values[wild.rank];
                     this.cards.push(wild);
                 }
                 this.cards = this.cards.concat(this.nextHighest().slice(0, this.game.cardsInHand - 5));
@@ -396,7 +401,7 @@ class FiveOfAKind extends Hand {
 }
 exports.FiveOfAKind = FiveOfAKind;
 class FourOfAKindPairPlus extends Hand {
-    constructor(cards, game, canDisqualify) {
+    constructor(cards, game, canDisqualify = false) {
         super(cards, "Four of a Kind with Pair or Better", game, canDisqualify);
     }
     solve() {
@@ -411,9 +416,9 @@ class FourOfAKindPairPlus extends Hand {
                         wild.rank = this.cards[0].rank;
                     }
                     else {
-                        wild.rank = values.length - 1;
+                        wild.rank = exports.values.length - 1;
                     }
-                    wild.wildValue = values[wild.rank];
+                    wild.wildValue = exports.values[wild.rank];
                     this.cards.push(wild);
                 }
                 break;
@@ -435,14 +440,14 @@ class FourOfAKindPairPlus extends Hand {
                         if (cardsArr && cardsArr[0]) {
                             wild.rank = cardsArr[0].rank;
                         }
-                        else if (this.cards[0].rank === values.length - 1 &&
+                        else if (this.cards[0].rank === exports.values.length - 1 &&
                             this.game.wildStatus === 1) {
-                            wild.rank = values.length - 2;
+                            wild.rank = exports.values.length - 2;
                         }
                         else {
-                            wild.rank = values.length - 1;
+                            wild.rank = exports.values.length - 1;
                         }
-                        wild.wildValue = values[wild.rank];
+                        wild.wildValue = exports.values[wild.rank];
                         this.cards.push(wild);
                     }
                     this.cards = this.cards.concat(this.nextHighest().slice(0, this.game.cardsInHand - 6));
@@ -462,7 +467,7 @@ class FourOfAKindPairPlus extends Hand {
 }
 exports.FourOfAKindPairPlus = FourOfAKindPairPlus;
 class FourOfAKind extends Hand {
-    constructor(cards, game, canDisqualify) {
+    constructor(cards, game, canDisqualify = false) {
         super(cards, "Four of a Kind", game, canDisqualify);
     }
     solve() {
@@ -476,9 +481,9 @@ class FourOfAKind extends Hand {
                         wild.rank = this.cards[0].rank;
                     }
                     else {
-                        wild.rank = values.length - 1;
+                        wild.rank = exports.values.length - 1;
                     }
-                    wild.wildValue = values[wild.rank];
+                    wild.wildValue = exports.values[wild.rank];
                     this.cards.push(wild);
                 }
                 this.cards = this.cards.concat(this.nextHighest().slice(0, this.game.cardsInHand - 4));
@@ -500,7 +505,7 @@ class FourOfAKind extends Hand {
 }
 exports.FourOfAKind = FourOfAKind;
 class FourWilds extends Hand {
-    constructor(cards, game, canDisqualify) {
+    constructor(cards, game, canDisqualify = false) {
         super(cards, "Four Wild Cards", game, canDisqualify);
     }
     solve() {
@@ -519,7 +524,7 @@ class FourWilds extends Hand {
 }
 exports.FourWilds = FourWilds;
 class ThreeOfAKindTwoPair extends Hand {
-    constructor(cards, game, canDisqualify) {
+    constructor(cards, game, canDisqualify = false) {
         super(cards, "Three of a Kind with Two Pair", game, canDisqualify);
     }
     solve() {
@@ -533,9 +538,9 @@ class ThreeOfAKindTwoPair extends Hand {
                         wild.rank = this.cards[0].rank;
                     }
                     else {
-                        wild.rank = values.length - 1;
+                        wild.rank = exports.values.length - 1;
                     }
-                    wild.wildValue = values[wild.rank];
+                    wild.wildValue = exports.values[wild.rank];
                     this.cards.push(wild);
                 }
                 break;
@@ -556,14 +561,14 @@ class ThreeOfAKindTwoPair extends Hand {
                         if (cardsArr && cardsArr[0]) {
                             wild.rank = cardsArr[0].rank;
                         }
-                        else if (this.cards[0].rank === values.length - 1 &&
+                        else if (this.cards[0].rank === exports.values.length - 1 &&
                             this.game.wildStatus === 1) {
-                            wild.rank = values.length - 2;
+                            wild.rank = exports.values.length - 2;
                         }
                         else {
-                            wild.rank = values.length - 1;
+                            wild.rank = exports.values.length - 1;
                         }
-                        wild.wildValue = values[wild.rank];
+                        wild.wildValue = exports.values[wild.rank];
                         this.cards.push(wild);
                     }
                     this.cards = this.cards.concat(this.nextHighest().slice(0, this.game.cardsInHand - 4));
@@ -578,14 +583,14 @@ class ThreeOfAKindTwoPair extends Hand {
                         if (cardsArr && cardsArr[0]) {
                             wild.rank = cardsArr[0].rank;
                         }
-                        else if (this.cards[0].rank === values.length - 1 &&
+                        else if (this.cards[0].rank === exports.values.length - 1 &&
                             this.game.wildStatus === 1) {
-                            wild.rank = values.length - 2;
+                            wild.rank = exports.values.length - 2;
                         }
                         else {
-                            wild.rank = values.length - 1;
+                            wild.rank = exports.values.length - 1;
                         }
-                        wild.wildValue = values[wild.rank];
+                        wild.wildValue = exports.values[wild.rank];
                         this.cards.push(wild);
                     }
                 }
@@ -605,7 +610,7 @@ class ThreeOfAKindTwoPair extends Hand {
 }
 exports.ThreeOfAKindTwoPair = ThreeOfAKindTwoPair;
 class FullHouse extends Hand {
-    constructor(cards, game, canDisqualify) {
+    constructor(cards, game, canDisqualify = false) {
         super(cards, "Full House", game, canDisqualify);
     }
     solve() {
@@ -620,9 +625,9 @@ class FullHouse extends Hand {
                         wild.rank = this.cards[0].rank;
                     }
                     else {
-                        wild.rank = values.length - 1;
+                        wild.rank = exports.values.length - 1;
                     }
-                    wild.wildValue = values[wild.rank];
+                    wild.wildValue = exports.values[wild.rank];
                     this.cards.push(wild);
                 }
                 break;
@@ -643,14 +648,14 @@ class FullHouse extends Hand {
                         if (cardsArr && cardsArr[0]) {
                             wild.rank = cardsArr[0].rank;
                         }
-                        else if (this.cards[0].rank === values.length - 1 &&
+                        else if (this.cards[0].rank === exports.values.length - 1 &&
                             this.game.wildStatus === 1) {
-                            wild.rank = values.length - 2;
+                            wild.rank = exports.values.length - 2;
                         }
                         else {
-                            wild.rank = values.length - 1;
+                            wild.rank = exports.values.length - 1;
                         }
-                        wild.wildValue = values[wild.rank];
+                        wild.wildValue = exports.values[wild.rank];
                         this.cards.push(wild);
                     }
                     this.cards = this.cards.concat(this.nextHighest().slice(0, this.game.cardsInHand - 5));
@@ -670,7 +675,7 @@ class FullHouse extends Hand {
 }
 exports.FullHouse = FullHouse;
 class Flush extends Hand {
-    constructor(cards, game, canDisqualify) {
+    constructor(cards, game, canDisqualify = false) {
         super(cards, "Flush", game, canDisqualify);
     }
     solve() {
@@ -700,7 +705,7 @@ class Flush extends Hand {
 }
 exports.Flush = Flush;
 class Straight extends Hand {
-    constructor(cards, game, canDisqualify) {
+    constructor(cards, game, canDisqualify = false) {
         super(cards, "Straight", game, canDisqualify);
         this.sfQualify = 0; // additional property used below
     }
@@ -719,7 +724,7 @@ class Straight extends Hand {
                         wildCount++;
                     }
                     if (card.rank === 0) {
-                        card.rank = values.indexOf("A");
+                        card.rank = exports.values.indexOf("A");
                         card.wildValue = "A";
                         if (card.value === "1") {
                             card.value = "A";
@@ -729,7 +734,7 @@ class Straight extends Hand {
                 this.cards = this.cards.sort(Card.sort);
                 for (; wildCount < this.wilds.length && this.cards.length < this.game.cardsInHand; wildCount++) {
                     card = this.wilds[wildCount];
-                    card.rank = values.indexOf("A");
+                    card.rank = exports.values.indexOf("A");
                     card.wildValue = "A";
                     this.cards.push(card);
                 }
@@ -751,14 +756,14 @@ class Straight extends Hand {
             card = this.wilds[i];
             checkCards = this.getGaps(this.cards.length);
             if (this.cards.length === checkCards.length) {
-                if (this.cards[0].rank < values.length - 1) {
+                if (this.cards[0].rank < exports.values.length - 1) {
                     card.rank = this.cards[0].rank + 1;
-                    card.wildValue = values[card.rank];
+                    card.wildValue = exports.values[card.rank];
                     this.cards.push(card);
                 }
                 else {
                     card.rank = this.cards[this.cards.length - 1].rank - 1;
-                    card.wildValue = values[card.rank];
+                    card.wildValue = exports.values[card.rank];
                     this.cards.push(card);
                 }
             }
@@ -766,7 +771,7 @@ class Straight extends Hand {
                 for (let j = 1; j < this.cards.length; j++) {
                     if (this.cards[j - 1].rank - this.cards[j].rank > 1) {
                         card.rank = this.cards[j - 1].rank - 1;
-                        card.wildValue = values[card.rank];
+                        card.wildValue = exports.values[card.rank];
                         this.cards.push(card);
                         break;
                     }
@@ -819,7 +824,7 @@ class Straight extends Hand {
         else {
             checkHandLength = this.game.sfQualify;
         }
-        for (let i = values.length; i > 0; i--) {
+        for (let i = exports.values.length; i > 0; i--) {
             cardsList = [];
             gapCount = 0;
             for (let j = 0; j < cardsToCheck.length; j++) {
@@ -879,7 +884,7 @@ class Straight extends Hand {
             if (!cardFound) {
                 if (wildCount < wildCards.length) {
                     wildCards[wildCount].rank = i;
-                    wildCards[wildCount].wildValue = values[i];
+                    wildCards[wildCount].wildValue = exports.values[i];
                     wheelCards.push(wildCards[wildCount]);
                     wildCount++;
                 }
@@ -893,7 +898,7 @@ class Straight extends Hand {
 }
 exports.Straight = Straight;
 class TwoThreeOfAKind extends Hand {
-    constructor(cards, game, canDisqualify) {
+    constructor(cards, game, canDisqualify = false) {
         super(cards, "Two Three Of a Kind", game, canDisqualify);
     }
     solve() {
@@ -909,14 +914,14 @@ class TwoThreeOfAKind extends Hand {
                     if (cardsArr && cardsArr[0]) {
                         wild.rank = cardsArr[0].rank;
                     }
-                    else if (this.cards[0].rank === values.length - 1 &&
+                    else if (this.cards[0].rank === exports.values.length - 1 &&
                         this.game.wildStatus === 1) {
-                        wild.rank = values.length - 2;
+                        wild.rank = exports.values.length - 2;
                     }
                     else {
-                        wild.rank = values.length - 1;
+                        wild.rank = exports.values.length - 1;
                     }
-                    wild.wildValue = values[wild.rank];
+                    wild.wildValue = exports.values[wild.rank];
                     this.cards.push(wild);
                 }
                 this.cards = this.cards.concat(this.nextHighest().slice(0, this.game.cardsInHand - 6));
@@ -931,14 +936,14 @@ class TwoThreeOfAKind extends Hand {
                     if (cardsArr && cardsArr[0]) {
                         wild.rank = cardsArr[0].rank;
                     }
-                    else if (this.cards[0].rank === values.length - 1 &&
+                    else if (this.cards[0].rank === exports.values.length - 1 &&
                         this.game.wildStatus === 1) {
-                        wild.rank = values.length - 2;
+                        wild.rank = exports.values.length - 2;
                     }
                     else {
-                        wild.rank = values.length - 1;
+                        wild.rank = exports.values.length - 1;
                     }
-                    wild.wildValue = values[wild.rank];
+                    wild.wildValue = exports.values[wild.rank];
                     this.cards.push(wild);
                 }
             }
@@ -955,7 +960,7 @@ class TwoThreeOfAKind extends Hand {
 }
 exports.TwoThreeOfAKind = TwoThreeOfAKind;
 class ThreeOfAKind extends Hand {
-    constructor(cards, game, canDisqualify) {
+    constructor(cards, game, canDisqualify = false) {
         super(cards, "Three of a Kind", game, canDisqualify);
     }
     solve() {
@@ -969,9 +974,9 @@ class ThreeOfAKind extends Hand {
                         wild.rank = this.cards[0].rank;
                     }
                     else {
-                        wild.rank = values.length - 1;
+                        wild.rank = exports.values.length - 1;
                     }
-                    wild.wildValue = values[wild.rank];
+                    wild.wildValue = exports.values[wild.rank];
                     this.cards.push(wild);
                 }
                 this.cards = this.cards.concat(this.nextHighest().slice(0, this.game.cardsInHand - 3));
@@ -993,7 +998,7 @@ class ThreeOfAKind extends Hand {
 }
 exports.ThreeOfAKind = ThreeOfAKind;
 class ThreePair extends Hand {
-    constructor(cards, game, canDisqualify) {
+    constructor(cards, game, canDisqualify = false) {
         super(cards, "Three Pair", game, canDisqualify);
     }
     solve() {
@@ -1009,14 +1014,14 @@ class ThreePair extends Hand {
                     if (cardsArr && cardsArr[0]) {
                         wild.rank = cardsArr[0].rank;
                     }
-                    else if (this.cards[0].rank === values.length - 1 &&
+                    else if (this.cards[0].rank === exports.values.length - 1 &&
                         this.game.wildStatus === 1) {
-                        wild.rank = values.length - 2;
+                        wild.rank = exports.values.length - 2;
                     }
                     else {
-                        wild.rank = values.length - 1;
+                        wild.rank = exports.values.length - 1;
                     }
-                    wild.wildValue = values[wild.rank];
+                    wild.wildValue = exports.values[wild.rank];
                     this.cards.push(wild);
                 }
                 this.cards = this.cards.concat(this.nextHighest().slice(0, this.game.cardsInHand - 6));
@@ -1031,14 +1036,14 @@ class ThreePair extends Hand {
                     if (cardsArr && cardsArr[0]) {
                         wild.rank = cardsArr[0].rank;
                     }
-                    else if (this.cards[0].rank === values.length - 1 &&
+                    else if (this.cards[0].rank === exports.values.length - 1 &&
                         this.game.wildStatus === 1) {
-                        wild.rank = values.length - 2;
+                        wild.rank = exports.values.length - 2;
                     }
                     else {
-                        wild.rank = values.length - 1;
+                        wild.rank = exports.values.length - 1;
                     }
-                    wild.wildValue = values[wild.rank];
+                    wild.wildValue = exports.values[wild.rank];
                     this.cards.push(wild);
                 }
             }
@@ -1057,7 +1062,7 @@ class ThreePair extends Hand {
 }
 exports.ThreePair = ThreePair;
 class TwoPair extends Hand {
-    constructor(cards, game, canDisqualify) {
+    constructor(cards, game, canDisqualify = false) {
         super(cards, "Two Pair", game, canDisqualify);
     }
     solve() {
@@ -1073,14 +1078,14 @@ class TwoPair extends Hand {
                     if (cardsArr && cardsArr[0]) {
                         wild.rank = cardsArr[0].rank;
                     }
-                    else if (this.cards[0].rank === values.length - 1 &&
+                    else if (this.cards[0].rank === exports.values.length - 1 &&
                         this.game.wildStatus === 1) {
-                        wild.rank = values.length - 2;
+                        wild.rank = exports.values.length - 2;
                     }
                     else {
-                        wild.rank = values.length - 1;
+                        wild.rank = exports.values.length - 1;
                     }
-                    wild.wildValue = values[wild.rank];
+                    wild.wildValue = exports.values[wild.rank];
                     this.cards.push(wild);
                 }
                 this.cards = this.cards.concat(this.nextHighest().slice(0, this.game.cardsInHand - 4));
@@ -1095,14 +1100,14 @@ class TwoPair extends Hand {
                     if (cardsArr && cardsArr[0]) {
                         wild.rank = cardsArr[0].rank;
                     }
-                    else if (this.cards[0].rank === values.length - 1 &&
+                    else if (this.cards[0].rank === exports.values.length - 1 &&
                         this.game.wildStatus === 1) {
-                        wild.rank = values.length - 2;
+                        wild.rank = exports.values.length - 2;
                     }
                     else {
-                        wild.rank = values.length - 1;
+                        wild.rank = exports.values.length - 1;
                     }
-                    wild.wildValue = values[wild.rank];
+                    wild.wildValue = exports.values[wild.rank];
                     this.cards.push(wild);
                 }
             }
@@ -1122,7 +1127,7 @@ class TwoPair extends Hand {
 }
 exports.TwoPair = TwoPair;
 class OnePair extends Hand {
-    constructor(cards, game, canDisqualify) {
+    constructor(cards, game, canDisqualify = false) {
         super(cards, "Pair", game, canDisqualify);
     }
     solve() {
@@ -1136,9 +1141,9 @@ class OnePair extends Hand {
                         wild.rank = this.cards[0].rank;
                     }
                     else {
-                        wild.rank = values.length - 1;
+                        wild.rank = exports.values.length - 1;
                     }
-                    wild.wildValue = values[wild.rank];
+                    wild.wildValue = exports.values[wild.rank];
                     this.cards.push(wild);
                 }
                 this.cards = this.cards.concat(this.nextHighest().slice(0, this.game.cardsInHand - 2));
@@ -1160,7 +1165,7 @@ class OnePair extends Hand {
 }
 exports.OnePair = OnePair;
 class HighCard extends Hand {
-    constructor(cards, game, canDisqualify) {
+    constructor(cards, game, canDisqualify = false) {
         super(cards, "High Card", game, canDisqualify);
     }
     solve() {
@@ -1169,7 +1174,7 @@ class HighCard extends Hand {
             const card = this.cards[i];
             if (card.value === this.game.wildValue) {
                 card.wildValue = "A";
-                card.rank = values.indexOf("A");
+                card.rank = exports.values.indexOf("A");
             }
         }
         if (this.game.noKickers) {
@@ -1545,8 +1550,8 @@ class PaiGowPokerHelper {
                 }
             }
             else if (altGame.handValues[altRank] === OnePair) {
-                if (altHand.cards[0].rank >= values.indexOf("T") &&
-                    altHand.cards[0].rank <= values.indexOf("K") &&
+                if (altHand.cards[0].rank >= exports.values.indexOf("T") &&
+                    altHand.cards[0].rank <= exports.values.indexOf("K") &&
                     altHand.cards[2].wildValue === "A") {
                     let possibleSF = altHand.cards.slice(0, 2);
                     possibleSF = possibleSF.concat(altHand.cards.slice(3, 7));

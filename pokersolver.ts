@@ -1,3 +1,4 @@
+export { default as HandEvaluator } from './outs';
 declare var exports: any;
 
 // NOTE: The 'joker' will be denoted with a value of 'O' and any suit.

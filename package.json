@@ -8,20 +8,23 @@
     "holdem",
     "poker-evaluator"
   ],
-  "author": "James Simpson <james@goldfirestudios.com> (http://goldfirestudios.com)",
+  "author": "Mike Ward",
   "repository": {
     "type": "git",
     "url": "git://github.com/goldfire/pokersolver.git"
   },
-  "main": "pokersolver.js",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "version": "2.1.4",
   "license": {
     "type": "MIT",
     "url": "https://raw.githubusercontent.com/goldfire/pokersolver/master/LICENSE.md"
   },
   "devDependencies": {
+    "@types/chai": "^5.2.0",
     "@types/mocha": "^10.0.10",
     "@types/should": "^11.2.0",
+    "chai": "^5.2.0",
     "mocha": "*",
     "should": "*",
     "ts-node": "^10.9.2",

@@ -1,6 +1,6 @@
 import { expect } from 'chai';
-import { Card, Hand, Game } from 'tooward-pokersolver';
-import HandEvaluator, { Out } from '../coach/outs';
+import { Card, Hand, Game } from '../pokersolver';
+import HandEvaluator, { Out } from '../outs';
 
 describe('checkOverCards', () => {
   it('should return a hole card higher than all community cards', () => {
@@ -230,5 +230,77 @@ describe('HandEvaluator.checkForInsideStraightDraw', () => {
     expect(() => {
       HandEvaluator.checkForInsideStraightDraw(cards);
     }).to.throw("At least four cards are required to check for an inside straight draw");
+  });
+});
+
+describe("outsToTwoPair", () => {
+  it("should return possibleHand false when there is no pair in the full hand", () => {
+    // Create a high card hand (no pair)
+    const holeCards = ["As", "Kd"].map(c => new Card(c));
+    const communityCards = ["Qh", "Jc", "9s"].map(c => new Card(c));
+    // Since no pair exists, two pair outs are not applicable.
+    const result: Out = HandEvaluator.outsToTwoPair(holeCards, communityCards);
+    expect(result.possibleHand).to.be.false;
+    expect(result.cardNeededCount).to.equal(0);
+    expect(result.cardsNeeded).to.have.lengthOf(0);
+    expect(result.outHand).to.equal("Two Pair");
+  });
+
+  it("should evaluate outs for a one-pair hand", () => {
+    // For example: a pair of 8's with three other cards.
+    // Hand: HoleCards: 8s, 8h; Community: Kc, 4d, 2s.
+    // The pair is 8's. The highest non-pair card is Kc.
+    // For a King, if Kc is present, missing suits are: "Kh", "Ks", "Kd".
+    const holeCards = ["8s", "8h"].map(c => new Card(c));
+    const communityCards = ["Kc", "4d", "2s"].map(c => new Card(c));
+    const result: Out = HandEvaluator.outsToTwoPair(holeCards, communityCards);
+    expect(result.possibleHand).to.be.true;
+    expect(result.outHand).to.equal("Two Pair");
+    expect(result.cardNeededCount).to.equal(3);
+    // Verify that the outs are for King and the missing suits.
+    const needed = result.cardsNeeded.map(card => card.toString()).sort();
+    const expected = ["Kh", "Ks", "Kd"].sort();
+    expect(needed).to.deep.equal(expected);
+  });
+
+  it("should return possibleHand false when the full hand already is two pair", () => {
+    // Example: Hand already has two pair: 
+    // HoleCards: 8s, 8h; Community: Kc, Kd, 2s.
+    const holeCards = ["8s", "8h"].map(c => new Card(c));
+    const communityCards = ["Kc", "Kd", "2s"].map(c => new Card(c));
+    const result: Out = HandEvaluator.outsToTwoPair(holeCards, communityCards);
+    // Since the hand already contains a pair of 8's and a pair of K's, we assume outsToTwoPair should return no outs.
+    expect(result.possibleHand).to.be.false;
+    expect(result.cardNeededCount).to.equal(0);
+    expect(result.cardsNeeded).to.have.lengthOf(0);
+  });
+
+  it("should return Out with no outs if the highest non-pair card already appears in all suits", () => {
+    // A scenario where the pair is, say, 7's and the highest non-pair card is a King that appears in every suit.
+    // Use: HoleCards: 7s, 7h; Community: Kc, Kh, Kd.
+    const holeCards = ["7s", "7h"].map(c => new Card(c));
+    const communityCards = ["Kc", "Kh", "Kd"].map(c => new Card(c));
+    const result: Out = HandEvaluator.outsToTwoPair(holeCards, communityCards);
+    // For King, all cards for that value are already in play ("Kc", "Kh", "Kd" are present, and presumbly the missing one "Ks" does not exist—but if only one suit is missing, then that is actually an out).
+    // Adjusting our interpretation: if one suit is missing, outs exist.
+    // In this test, to show a case with no outs, ensure that the highest non-pair card appears in all four suits.
+    // For instance, if we combine holeCards: 7s, 7h; Community: Kc, Kh, Kd, Ks.
+    const communityCardsAllKings = ["Kc", "Kh", "Kd", "Ks"].map(c => new Card(c));
+    const resultNoOuts: Out = HandEvaluator.outsToTwoPair(holeCards, communityCardsAllKings);
+    expect(resultNoOuts.possibleHand).to.be.false;
+    expect(resultNoOuts.cardNeededCount).to.equal(0);
+    expect(resultNoOuts.cardsNeeded).to.have.lengthOf(0);
+  });
+
+  it("should throw an error if holeCards array does not have exactly two cards", () => {
+    const holeCards = ["As"].map(c => new Card(c));
+    const communityCards = ["Qh", "Jc", "9s"].map(c => new Card(c));
+    expect(() => HandEvaluator.outsToTwoPair(holeCards, communityCards)).to.throw("Must provide exactly two hole cards");
+  });
+
+  it("should throw an error if communityCards array is not between 3 and 5 cards", () => {
+    const holeCards = ["As", "Kd"].map(c => new Card(c));
+    const communityCards = ["Qh", "Jc"].map(c => new Card(c)); // only 2 cards
+    expect(() => HandEvaluator.outsToTwoPair(holeCards, communityCards)).to.throw("Community cards must be between 3 and 5");
   });
 });
