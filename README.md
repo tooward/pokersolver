@@ -12,6 +12,10 @@ Pokersolver is a poker hand solver and comparison tool written in Javascript. It
 * Support for wilds and other game types
 * Works in both the browser and Node.js
 
+
+## Development
+npx tsc
+
 ## Installation
 ```
 npm install pokersolver

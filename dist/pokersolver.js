@@ -27,6 +27,14 @@ exports.values = [
 // Card class
 // --------------------------
 class Card {
+    /*
+      * Helper function to build a properly formatted combined set of Card[]
+      * Card constructor expects values in specific order
+    */
+    static combineHoleAndCommunity(holeCards, communityCards) {
+        const allCards = [...holeCards.map(c => new Card(c.value + c.suit + c.rank)), ...communityCards.map(c => new Card(c.value + c.suit + c.rank))];
+        return allCards;
+    }
     constructor(str) {
         this.value = str.substr(0, 1);
         this.suit = str.substr(1, 1).toLowerCase();
