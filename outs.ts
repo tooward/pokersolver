@@ -33,6 +33,12 @@ import { Card, values, Hand, Game } from './pokersolver';
   //       HighCard,
   //     ],
 
+export enum PokerError {
+  PreflopNotAllowed = "PRE_FLOP_NOT_ALLOWED",
+  InsufficientCommunityCards = "INSUFFICIENT_COMMUNITY_CARDS",
+  InvalidHoleCards = "INVALID_HOLE_CARDS"
+}
+
 export class Out {
     possibleHand: boolean = false;
     outHand: string = "";
@@ -49,6 +55,23 @@ export class Outs {
   communityCards: Card[] = [];
   holeCards: Card[] = [];
   handStage: string = "";
+  boardTexture: BoardTexture = {
+    paired: false,  // true if there is a pair on the board
+    monotone: false,  // true if all cards are of the same suit
+    twoTone: false,  // true if there are two suits on the board
+    connectivity: 0,  // 0 = disconnected → 4 = highly connected
+    straightDraw: 'none',  // 'none', 'gutshot', or 'open'
+    flushDraw: false
+  };
+}
+
+export interface BoardTexture {
+  paired: boolean
+  monotone: boolean
+  twoTone: boolean
+  connectivity: number    // 0 = disconnected → 4 = highly connected
+  straightDraw: 'none'|'gutshot'|'open'
+  flushDraw: boolean
 }
 
 export enum HandRankings {
@@ -114,9 +137,13 @@ export default class HandEvaluator {
       }
 
     //TODO - Need to adjust calculateOuts()
-        // - Starting point is the best hand that can be made with community only cards, not the players hand
-        // - Need to check for the best hand that can be made with the community cards first
-        // - Need to chek past just the next best hand. Look at all hands that can be created with hole + community cards that exceed the current possible community hand
+        // - Starting point is the best hand that can be made with community only cards, not just the players hand
+        // - 	1.	Clean outs → improve your hand without likely giving opponents a better one
+	      // -  2.	Dirty outs → improve you but also create a stronger hand for someone else (or tie)
+        // 1.	List every card that completes your best hand.
+        // 2.	Subtract any card that would ALSO give a better hand to an opponent.
+        // 3.	Subtract any card that makes the board a strong hand on its own (full house, straight, flush)
+    // TDOO - Need to calculate the board texture
     static calculateOuts(holeCards: Card[], communityCards: Card[]): Outs {
       // check if hand is preflop
       const outsContainer = new Outs();
@@ -127,6 +154,7 @@ export default class HandEvaluator {
         return outsContainer;
       }
 
+      // Set the cards onto the result
       outsContainer.communityCards = communityCards;
       outsContainer.holeCards = holeCards;
       if (communityCards.length === 3) {
@@ -136,6 +164,9 @@ export default class HandEvaluator {
       } else if (communityCards.length === 5) { 
         outsContainer.handStage = "River";
       }
+
+      // Evaluate the board texture
+      outsContainer.boardTexture = HandEvaluator.evaluateBoard(communityCards);
 
       // create a Hand object from the hole and community cards
       const allCards = HandEvaluator.combineHoleAndCommunity(holeCards, communityCards);
@@ -270,6 +301,61 @@ export default class HandEvaluator {
       }
 
       return outsContainer;
+    }
+
+    /*
+     * Evaluates the board texture based on the cards on the board.
+    */
+    static evaluateBoard(board: Card[]): BoardTexture {
+      if (board.length < 3 || board.length > 5)
+        throw new Error(PokerError.InsufficientCommunityCards);
+    
+      // Use the shared cardValues if available, otherwise fallback to a standard array.
+      const cardValues = (values && values.length > 0)
+        ? values
+        : ['2','3','4','5','6','7','8','9','T','J','Q','K','A'];
+    
+      // Collect suits and determine the index for each card rank.
+      const suits = board.map(c => c.suit);
+    
+      // Use c.value (which should be defined in your Card implementation)
+      const ranks = board.map(c => cardValues.indexOf(c.value)).sort((a, b) => a - b);
+    
+      // If fewer unique ranks than board length, then at least one pair exists.
+      const paired = new Set(ranks).size < board.length;
+    
+      // Count cards per suit.
+      const suitCounts = suits.reduce<Record<string, number>>((acc, s) => {
+        acc[s] = (acc[s] || 0) + 1;
+        return acc;
+      }, {});
+      const maxSuit = Math.max(...Object.values(suitCounts));
+      const monotone = maxSuit === board.length;   // All cards share the same suit.
+      const twoTone = maxSuit === 2;                 // Exactly 2 cards of one suit.
+    
+      // For connectivity, consider the board length (n).
+      const n = board.length;
+      // Gap is how much the range spreads beyond a perfectly consecutive sequence.
+      const gap = (ranks[n - 1] - ranks[0]) - (n - 1);
+      const connectivity = Math.max(0, (n - 1) - gap);
+    
+      // Straight draw classification:
+      // openDraw if the range is <= 4 and there is no pair.
+      const openDraw = (ranks[n - 1] - ranks[0] <= 4 && !paired);
+      // Gutshot if not open-ended but connectivity is present.
+      const gutshot = !openDraw && connectivity >= 2 && !paired;
+    
+      // Flush draw present if at least 2 cards are of the same suit.
+      const flushDraw = maxSuit >= 2;
+    
+      return {
+        paired,
+        monotone,
+        twoTone,
+        connectivity,
+        straightDraw: openDraw ? 'open' : (gutshot ? 'gutshot' : 'none'),
+        flushDraw,
+      };
     }
 
     /**

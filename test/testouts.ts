@@ -1,6 +1,6 @@
 import { expect } from 'chai';
 import { Card, Hand, Game } from '../pokersolver';
-import HandEvaluator, { Out } from '../outs';
+import HandEvaluator, { Outs, Out, PokerError, BoardTexture } from '../outs';
 
 describe("HandEvaluator.calculateOuts", () => {
   it("should return empty outs for a preflop scenario", () => {
@@ -106,6 +106,79 @@ describe("HandEvaluator.calculateOuts", () => {
     // Expect that either a flush candidate or a straight flush candidate appears.
     expect(result.outs.some(out => out.outHand === "Flush" || out.outHand === "Straight Flush"))
       .to.be.true;
+  });
+});
+
+describe("HandEvaluator.evaluateBoard", () => {
+  it("should throw an error when board has fewer than 3 cards", () => {
+    const board = [new Card("2h"), new Card("3d")];
+    expect(() => HandEvaluator.evaluateBoard(board))
+      .to.throw(PokerError.InsufficientCommunityCards);
+  });
+
+  it("should throw an error when board has more than 5 cards", () => {
+    const board = [
+      new Card("2h"),
+      new Card("3d"),
+      new Card("4s"),
+      new Card("5c"),
+      new Card("6h"),
+      new Card("7d")
+    ];
+    expect(() => HandEvaluator.evaluateBoard(board))
+      .to.throw(PokerError.InsufficientCommunityCards);
+  });
+
+  it("should correctly evaluate a flop board with no pairs, no draws (e.g. '2h', '5d', '9s')", () => {
+    // Using shared values: ['2','3','4','5','6','7','8','9','T','J','Q','K','A']
+    // "2" -> index 0, "5" -> index 3, "9" -> index 7.
+    const board = [new Card("2h"), new Card("5d"), new Card("9s")];
+    const texture: BoardTexture = HandEvaluator.evaluateBoard(board);
+    
+    expect(texture.paired).to.be.false;
+    expect(texture.monotone).to.be.false;
+    expect(texture.twoTone).to.be.false;
+    // Calculation: gap = (7 - 0) - 2 = 5; connectivity = max(0, 2 - 5) = 0.
+    expect(texture.connectivity).to.equal(0);
+    expect(texture.straightDraw).to.equal("none");
+    expect(texture.flushDraw).to.be.false;
+  });
+
+  it("should detect an open-ended straight draw on the flop (e.g. '7h', '8d', '9s')", () => {
+    // "7" -> index 5, "8" -> index 6, "9" -> index 7.
+    const board = [new Card("7h"), new Card("8d"), new Card("9s")];
+    const texture: BoardTexture = HandEvaluator.evaluateBoard(board);
+    
+    expect(texture.paired).to.be.false;
+    expect(texture.straightDraw).to.equal("open");
+    expect(texture.connectivity).to.equal(2);
+    expect(texture.flushDraw).to.be.false;
+  });
+
+  it("should evaluate a paired board correctly (e.g. '8h', '8d', 'Ks')", () => {
+    const board = [new Card("8h"), new Card("8d"), new Card("Ks")];
+    const texture: BoardTexture = HandEvaluator.evaluateBoard(board);
+    
+    expect(texture.paired).to.be.true;
+    expect(texture.straightDraw).to.equal("none");
+  });
+
+  it("should evaluate a turn board with a flush draw (e.g. ['2h', '4h', '7h', 'Jd'])", () => {
+    const board = [new Card("2h"), new Card("4h"), new Card("7h"), new Card("Jd")];
+    const texture: BoardTexture = HandEvaluator.evaluateBoard(board);
+    
+    expect(texture.flushDraw).to.be.true;
+    expect(texture.monotone).to.be.false;
+  });
+
+  it("should evaluate a river board that is monotone (e.g. ['2h', '5h', '9h', 'Kh', 'Ah'])", () => {
+    const board = [new Card("2h"), new Card("5h"), new Card("9h"), new Card("Kh"), new Card("Ah")];
+    const texture: BoardTexture = HandEvaluator.evaluateBoard(board);
+    
+    expect(texture.monotone).to.be.true;
+    expect(texture.flushDraw).to.be.true;
+    expect(texture.paired).to.be.false;
+    expect(texture.straightDraw).to.equal("none");
   });
 });
 
