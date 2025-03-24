@@ -113,13 +113,6 @@ export default class HandEvaluator {
         return allCards;
       }
 
-    //TODO - Need to adjust the out checks:
-        // Hand has two pair but not a full house.
-        // Example: holeCards: 7h, Qh; communityCards: 7d, Qd, 9s.
-        // Two pair: 7's and Q's.
-        // Outs for full house by completing either pair:
-        // For 7's: if 7h and 7d are held, candidate outs: "7" of clubs and spades.
-        // For Q's: if Qh and Qd are held, candidate outs: "Q" of clubs and spades.
     //TODO - Need to adjust calculateOuts()
         // - Starting point is the best hand that can be made with community only cards, not the players hand
         // - Need to check for the best hand that can be made with the community cards first
@@ -146,13 +139,8 @@ export default class HandEvaluator {
 
       // create a Hand object from the hole and community cards
       const allCards = HandEvaluator.combineHoleAndCommunity(holeCards, communityCards);
-  //    console.log("calculateOuts() - all cards:", allCards);
       const game = new Game("standard");
-      // use the handsolver to find the best hand
       const hand = Hand.solve(allCards, game);
-      // create new out object to return the result
-      let out: Out = new Out();
-  //    console.log("calculateOuts() - best hand:", hand.name);
   
       // We check from high card upward
       if (hand.name === HandRankings.highCard) {
@@ -174,10 +162,18 @@ export default class HandEvaluator {
           }
           outsContainer.highestOutHand = outs[0].outHand;
         }
-      }
+
+        const outs3 = this.outsToThreeKind(holeCards, communityCards);
+        if (outs3 && outs3.length > 0) {
+          for (const o of outs3) {
+            outsContainer.outs.push(o);
+          }
+          outsContainer.highestOutHand = outs3[0].outHand;
+        }
+      }      
 
       if ( hand.name === HandRankings.twopair ) {
-        const outs = this.outsToThreeKind(holeCards, communityCards);
+        const outs = this.outsToFullHouse(holeCards, communityCards);
         if (outs && outs.length > 0) {
           for (const o of outs) {
             outsContainer.outs.push(o);
@@ -187,6 +183,37 @@ export default class HandEvaluator {
       }
 
       if ( hand.name === HandRankings.threeofakind ) {
+        const outs = this.outsToFullHouse(holeCards, communityCards);
+        if (outs && outs.length > 0) {
+          for (const o of outs) {
+            outsContainer.outs.push(o);
+          }
+          outsContainer.highestOutHand = outs[0].outHand;
+        }
+
+        const out4 = this.outsToFourKind(holeCards, communityCards);
+        if (out4 && out4.length > 0) {
+          for (const o of out4) {
+            outsContainer.outs.push(o);
+          }
+          outsContainer.highestOutHand = out4[0].outHand;
+        }
+      }
+
+      // if this is a flush draw check for a flush out
+      const isFlushDraw = this.isFlushDraw(holeCards, communityCards);
+      if (isFlushDraw) {
+        const outs = this.outsToFlush(holeCards, communityCards);
+        if (outs && outs.length > 0) {
+          for (const o of outs) {
+            outsContainer.outs.push(o);
+          }
+          outsContainer.highestOutHand = outs[0].outHand;
+        }
+      }
+      
+      const isStraightDraw = this.isStraightDraw(holeCards, communityCards);
+      if (isStraightDraw) {
         try {
           const outs = this.outsToStraightOESD(holeCards, communityCards);
           if (outs && outs.length > 0) {
@@ -212,48 +239,8 @@ export default class HandEvaluator {
         }
       }
 
-      if ( hand.name === HandRankings.straight ) {
-        try {
-          const outs = this.outsToFlush(holeCards, communityCards);
-          if (outs && outs.length > 0) {
-            for (const o of outs) {
-              outsContainer.outs.push(o);
-            }
-            outsContainer.highestOutHand = outs[0].outHand;
-          }
-        } catch (e) {
-          console.error("calculateOuts() - Error in outsToStraightGutshot:", e);
-        }
-      }
-
-      if ( hand.name === HandRankings.flush ) {
-        try {
-          const outs = this.outsToFullHouse(holeCards, communityCards);
-          if (outs && outs.length > 0) {
-            for (const o of outs) {
-              outsContainer.outs.push(o);
-            }
-            outsContainer.highestOutHand = outs[0].outHand;
-          }
-        } catch (e) {
-          console.error("calculateOuts() - Error in outsToFullHouse:", e);
-        }
-      }
-
-      if ( hand.name === HandRankings.fullhouse ) {
-        const outs = this.outsToFourKind(holeCards, communityCards);
-        if (outs && outs.length > 0) {
-          for (const o of outs) {
-            outsContainer.outs.push(o);
-          }
-          outsContainer.highestOutHand = outs[0].outHand;
-        }
-      }
-
-      if (
-      hand.name === HandRankings.fourofkind
-      ) {
-        try {
+      if (hand.name === HandRankings.straight) {
+        if (isFlushDraw) {
           const outs = this.outsToStraightFlush(holeCards, communityCards);
           if (outs && outs.length > 0) {
             for (const o of outs) {
@@ -261,15 +248,14 @@ export default class HandEvaluator {
             }
             outsContainer.highestOutHand = outs[0].outHand;
           }
-        } catch (e) {
-          console.error("calculateOuts() - Error in outsToStraightFlush:", e);
         }
       }
 
-      // Consolidate unique candidate outs.
+      // Consolidate unique candidate outs, ensure no duplicates
       for (const candidateOut of outsContainer.outs) {
         for (const card of candidateOut.cardsThatCanMakeHand) {
-          if (!outsContainer.outCards.some(c => c.rank === card.rank && c.suit === card.suit)) {
+          const candidateCardStr = card.toString(); // assumes toString() returns a unique identifier like "Ah"
+          if (!outsContainer.outCards.some(existingCard => existingCard.toString() === candidateCardStr)) {
             outsContainer.outCards.push(card);
           }
         }
@@ -322,6 +308,85 @@ export default class HandEvaluator {
         }
         
         return higherCards;
+    }
+
+    /*
+    * Helper function to determine if a hand is a flush draw 
+    */
+    static isFlushDraw(holeCards: Card[], communityCards: Card[]): boolean {
+      // Combine the hole cards and community cards
+      const allCards: Card[] = [...holeCards, ...communityCards];
+      
+      // Count the cards per suit.
+      const suitCounts: { [suit: string]: number } = { s: 0, h: 0, d: 0, c: 0 };
+      for (const card of allCards) {
+        suitCounts[card.suit] = (suitCounts[card.suit] || 0) + 1;
+      }
+      
+      // A flush draw exists if exactly four cards of any suit are present
+      // (assuming the flush is not already made).
+      for (const suit of ['s', 'h', 'd', 'c']) {
+        if (suitCounts[suit] === 4) {
+          return true;
+        }
+      }
+      
+      return false;
+    }
+
+    /*
+    function that detects a straight draw. 
+    In this implementation we combine the hole and community cards, extract a sorted, unique list of rank indices (using a fixed ordering), 
+    and then iterate over every possible 5‐card straight candidate. 
+    If exactly 4 of the 5 needed ranks are present, we consider that a straight draw (either an open‑ended or inside/gutshot draw) exists. 
+    This function returns a boolean indicating whether such a draw is detected. 
+    It also “considers that it may be a total of 5 of 6 cards” by looking at the possibility of a missing card in a 5‑card sequence.
+    */
+    static isStraightDraw(holeCards: Card[], communityCards: Card[]): boolean {
+      // Combine the hole and community cards.
+      const allCards: Card[] = [...holeCards, ...communityCards];
+      
+      // Define the standard order of card values.
+      const cardValues = ['2','3','4','5','6','7','8','9','T','J','Q','K','A'];
+      
+      // Create a set of unique rank indices according to cardValues.
+      const uniqueIndices = new Set<number>();
+      for (const card of allCards) {
+        const index = cardValues.indexOf(card.value);
+        if (index !== -1) uniqueIndices.add(index);
+        // Also treat Ace as low if needed (i.e. Ace can represent rank 0 in a 5-high straight)
+        if (card.value === 'A') {
+          uniqueIndices.add(-1);
+        }
+      }
+      
+      // Convert the set to a sorted array.
+      const sortedIndices = Array.from(uniqueIndices).sort((a, b) => a - b);
+      
+      // Look at every possible block of 5 consecutive rank values in cardValues.
+      // A straight draw requires that exactly four out of five ranks are present.
+      for (let i = -1; i <= cardValues.length - 5; i++) {
+        // Build the full candidate sequence: i, i+1, i+2, i+3, i+4.
+        const candidate: number[] = [];
+        for (let j = 0; j < 5; j++) {
+          candidate.push(i + j);
+        }
+        
+        // Count how many of these candidate ranks are present.
+        let count = 0;
+        for (const rank of candidate) {
+          if (sortedIndices.includes(rank)) {
+            count++;
+          }
+        }
+        
+        // If exactly 4 of the 5 candidate ranks are present, we have a straight draw.
+        if (count === 4) {
+          return true;
+        }
+      }
+      
+      return false;
     }
 
     /**

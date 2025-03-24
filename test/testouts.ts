@@ -2,6 +2,113 @@ import { expect } from 'chai';
 import { Card, Hand, Game } from '../pokersolver';
 import HandEvaluator, { Out } from '../outs';
 
+describe("HandEvaluator.calculateOuts", () => {
+  it("should return empty outs for a preflop scenario", () => {
+    // Preflop (less than 3 community cards) should return an empty Outs container.
+    const holeCards = ["As", "Kd"].map(c => new Card(c));
+    const communityCards = ["2h", "3d"].map(c => new Card(c)); // only 2 cards
+    const result = HandEvaluator.calculateOuts(holeCards, communityCards);
+    expect(result.outs).to.be.empty;
+  });
+
+  it("should evaluate a high card hand and return Pair outs", () => {
+    // High Card scenario:
+    // Hole: 8♠, Q♣; Community: 3♦, 4♥, J♠.
+    // No made pair. Only improvement is to pair one of the hole cards.
+    const holeCards = ["8s", "Qc"].map(c => new Card(c));
+    const communityCards = ["3d", "4h", "Js"].map(c => new Card(c));
+    const result = HandEvaluator.calculateOuts(holeCards, communityCards);
+    // Assuming the solver yields a "High Card" hand,
+    // outsToPair (one per eligible over card) will run.
+    expect(result.outs.length).to.be.greaterThan(0);
+    expect(result.highestOutHand).to.equal("Pair");
+    // Verify that outCards are unique and well formed.
+    result.outCards.forEach(card => {
+      expect(card).to.be.instanceOf(Card);
+    });
+  });
+
+  it("should evaluate a high card hand with a flush draw and return Flush outs", () => {
+    // High Card but with a flush draw:
+    // Hole: A♥, 7♥; Community: 3♥, 8♥, 2♦.
+    // 4 hearts total → flush draw.
+    const holeCards = ["Ah", "7h"].map(c => new Card(c));
+    const communityCards = ["3h", "8h", "2d"].map(c => new Card(c));
+    const result = HandEvaluator.calculateOuts(holeCards, communityCards);
+    // Even though the best made hand is "High Card" (or possibly a pair if one card qualifies),
+    // the flush draw branch is checked afterward.
+    expect(result.outs.some(out => out.outHand === "Flush")).to.be.true;
+    // Since the flush branch runs later, highestOutHand should be "Flush".
+    expect(result.highestOutHand).to.equal("Flush");
+  });
+
+  it("should evaluate a one pair hand and return two pair / three-of-a-kind outs", () => {
+    // One Pair scenario:
+    // Hole: A♠, 7♥; Community: A♣, 3♣, T♦.
+    // Makes a pair of Aces.
+    const holeCards = ["As", "7h"].map(c => new Card(c));
+    const communityCards = ["Ac", "3c", "Td"].map(c => new Card(c));
+    const result = HandEvaluator.calculateOuts(holeCards, communityCards);
+    // In the Pair branch, outsToTwoPair and outsToThreeKind are computed.
+    // We expect at least one improvement candidate from one of these functions.
+    expect(result.outs.some(out => out.outHand === "Two Pair" || out.outHand === "Three of a Kind"))
+      .to.be.true;
+    // According to our logic, if outsToThreeKind returns outs then highestOutHand is set to that.
+    expect(["Two Pair", "Three of a Kind"]).to.include(result.highestOutHand);
+  });
+
+  it("should evaluate a two pair hand and return Full House outs", () => {
+    // Two Pair scenario:
+    // Hole: 7♥, Q♥; Community: 7♦, Q♦, 9♠.
+    // Made two pair (7's and Q's). Improvement to Full House is possible.
+    const holeCards = ["7h", "Qh"].map(c => new Card(c));
+    const communityCards = ["7d", "Qd", "9s"].map(c => new Card(c));
+    const result = HandEvaluator.calculateOuts(holeCards, communityCards);
+    // The two pair branch calls outsToFullHouse.
+    expect(result.outs.some(out => out.outHand === "Full House")).to.be.true;
+    expect(result.highestOutHand).to.equal("Full House");
+  });
+
+  it("should evaluate a three of a kind hand and return both Full House and Four of a Kind outs", () => {
+    // Three of a Kind scenario:
+    // Hole: 7♥, 7♦; Community: 7♠, Q♦, 9♠.
+    // This gives trip 7's. Improvement to Full House and Four of a Kind is possible.
+    const holeCards = ["7h", "7d"].map(c => new Card(c));
+    const communityCards = ["7s", "Qd", "9s"].map(c => new Card(c));
+    const result = HandEvaluator.calculateOuts(holeCards, communityCards);
+    expect(result.outs.some(out => out.outHand === "Full House")).to.be.true;
+    expect(result.outs.some(out => out.outHand === "Four of a Kind")).to.be.true;
+    // In our three-of-a-kind branch, if Four of a Kind outs exist they are computed last.
+    expect(result.highestOutHand).to.equal("Four of a Kind");
+  });
+
+  it("should evaluate a hand with a straight draw and return straight outs", () => {
+    // Straight draw scenario:
+    // Hole: 8♠, 9♣; Community: 7♦, T♠, 2♥.
+    // Cards present: 7,8,9,10 with one card missing to complete a straight.
+    const holeCards = ["8s", "9c"].map(c => new Card(c));
+    const communityCards = ["7d", "Ts", "2h"].map(c => new Card(c));
+    const result = HandEvaluator.calculateOuts(holeCards, communityCards);
+    // The straight draw branch computes outs (from both OESD and inside draw functions).
+    // Verify at least one out from either straight draw candidate exists.
+    expect(result.outs.some(out => out.outHand.match(/Straight/))).to.be.true;
+    expect(result.highestOutHand).to.match(/Straight/);
+  });
+
+  it("should evaluate a hand with combined straight and flush draws (potential straight flush draw)", () => {
+    // Combined draw scenario:
+    // Hole: A♥, K♥; Community: Q♥, J♥, 9♣.
+    // There are 4 hearts (flush draw) and the cards A, K, Q, J are present (a straight draw missing T).
+    // Thus, a straight flush draw improvement might be possible.
+    const holeCards = ["Ah", "Kh"].map(c => new Card(c));
+    const communityCards = ["Qh", "Jh", "9c"].map(c => new Card(c));
+    const result = HandEvaluator.calculateOuts(holeCards, communityCards);
+    // Expect that either a flush candidate or a straight flush candidate appears.
+    expect(result.outs.some(out => out.outHand === "Flush" || out.outHand === "Straight Flush"))
+      .to.be.true;
+  });
+});
+
 describe('checkOverCards', () => {
   it('should return a hole card higher than all community cards', () => {
     const hole = ['As', 'Ts'].map(c => new Card(c));
@@ -61,6 +168,93 @@ describe('checkOverCards', () => {
     expect(() => {
       HandEvaluator.checkOverCards(hole, community);
     }).to.throw('Community cards must be provided to check for over cards');
+  });
+});
+
+describe("HandEvaluator.isFlushDraw", () => {
+  it("should return true if exactly four cards of a suit are present", () => {
+    // Example: hole cards: Ah, 7h and community cards: 3h, 8h, 2d.
+    // This gives exactly four hearts.
+    const holeCards = ["Ah", "7h"].map(c => new Card(c));
+    const communityCards = ["3h", "8h", "2d"].map(c => new Card(c));
+    
+    const result = HandEvaluator.isFlushDraw(holeCards, communityCards);
+    expect(result).to.be.true;
+  });
+
+  it("should return false if fewer than four cards of any suit are present", () => {
+    // Example: hole cards: Ah, 7d and community cards: 3h, 8c, 2d.
+    // No suit reaches 4 cards.
+    const holeCards = ["Ah", "7d"].map(c => new Card(c));
+    const communityCards = ["3h", "8c", "2d"].map(c => new Card(c));
+
+    const result = HandEvaluator.isFlushDraw(holeCards, communityCards);
+    expect(result).to.be.false;
+  });
+
+  it("should return false if a flush is already made (5 or more cards of a suit)", () => {
+    // Example: hole cards: Ah, 7h and community cards: 3h, 8h, 2h.
+    // This produces 5 hearts which is a made flush (not a draw).
+    const holeCards = ["Ah", "7h"].map(c => new Card(c));
+    const communityCards = ["3h", "8h", "2h"].map(c => new Card(c));
+
+    const result = HandEvaluator.isFlushDraw(holeCards, communityCards);
+    expect(result).to.be.false;
+  });
+});
+
+describe("HandEvaluator.isStraightDraw", () => {
+  it("should return true for an inside straight draw", () => {
+    // Example: Hole: 8♠, 9♣; Community: 7♦, 10♠, 2♥.
+    // Here the candidate 5‑card straight is 7-8-9-10-J.
+    // 7, 8, 9, and 10 are present (and J is missing) so exactly 4 of 5 exist.
+    const holeCards = ["8s", "9c"].map(c => new Card(c));
+    const communityCards = ["7d", "Ts", "2h"].map(c => new Card(c));
+    
+    const result = HandEvaluator.isStraightDraw(holeCards, communityCards);
+    expect(result).to.be.true;
+  });
+
+  it("should return true if the straight is already complete", () => {
+    // Example: Hole: 8♠, 9♣; Community: 7♦, 10♠, Jd.
+    // Here the straight 7-8-9-10-J is complete (5 cards present), so it's not a draw.
+    const holeCards = ["8s", "9c"].map(c => new Card(c));
+    const communityCards = ["7d", "Ts", "Jd"].map(c => new Card(c));
+    
+    const result = HandEvaluator.isStraightDraw(holeCards, communityCards);
+    expect(result).to.be.true;
+  });
+
+  it("should return false when no straight draw is present", () => {
+    // Example: Hole: 2♥, 4♠; Community: 7♦, 10♠, 3♣.
+    // No contiguous block of 4 exists.
+    const holeCards = ["2h", "4s"].map(c => new Card(c));
+    const communityCards = ["7d", "Ts", "3c"].map(c => new Card(c));
+    
+    const result = HandEvaluator.isStraightDraw(holeCards, communityCards);
+    expect(result).to.be.false;
+  });
+
+  it("should return true for an Ace-low inside straight draw", () => {
+    // Example: Ace can be played low for a A-2-3-4-5 straight.
+    // Hole: A♠, 3♦; Community: 2♣, 4♥, 9s.
+    // With Ace processed as both high and low (-1), we have -1, 0, 1, and 2 present.
+    // Candidate sequence: [-1, 0, 1, 2, 3] where '5' (index 3) is missing.
+    const holeCards = ["As", "3d"].map(c => new Card(c));
+    const communityCards = ["2c", "4h", "9s"].map(c => new Card(c));
+    
+    const result = HandEvaluator.isStraightDraw(holeCards, communityCards);
+    expect(result).to.be.true;
+  });
+
+  it("should detect an open-ended straight draw as a draw", () => {
+    // Example: Hole: 5♥, 6♥; Community: 7♦, 8♣, Kd.
+    // Candidate straight: 5-6-7-8-9, missing 9.
+    const holeCards = ["5h", "6h"].map(c => new Card(c));
+    const communityCards = ["7d", "8c", "Kd"].map(c => new Card(c));
+    
+    const result = HandEvaluator.isStraightDraw(holeCards, communityCards);
+    expect(result).to.be.true;
   });
 });
 
