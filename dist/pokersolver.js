@@ -32,7 +32,10 @@ class Card {
       * Card constructor expects values in specific order
     */
     static combineHoleAndCommunity(holeCards, communityCards) {
-        const allCards = [...holeCards.map(c => new Card(c.value + c.suit + c.rank)), ...communityCards.map(c => new Card(c.value + c.suit + c.rank))];
+        const allCards = [
+            ...holeCards.map(c => new Card(c.value + c.suit)),
+            ...communityCards.map(c => new Card(c.value + c.suit))
+        ];
         return allCards;
     }
     constructor(str) {
@@ -42,7 +45,7 @@ class Card {
         this.wildValue = str.substr(0, 1);
     }
     toString() {
-        return this.wildValue.replace("T", "10") + this.suit;
+        return this.value + this.suit;
     }
     static sort(a, b) {
         if (a.rank > b.rank) {

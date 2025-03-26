@@ -14,6 +14,24 @@ import {
 
 const gameForTest = new Game('standard');
 
+// describe("Card.toString()", () => {
+//   it("should return the proper card string without modifying face card values", () => {
+//     const tests = [
+//       { input: "2h", expected: "2h" },
+//       { input: "3c", expected: "3c" },
+//       { input: "Th", expected: "Th" },
+//       { input: "Jh", expected: "Jh" },
+//       { input: "Qd", expected: "Qd" },
+//       { input: "Kc", expected: "Kc" },
+//       { input: "As", expected: "As" },
+//     ];
+
+//     tests.forEach(testCase => {
+//       const card = new Card(testCase.input);
+//       expect(card.toString()).to.equal(testCase.expected);
+//     });
+//   });
+
 describe('A basic hand', function () {
   it('should return a hand with cards sorted descending', function () {
     const hand = Hand.solve(['Kh', 'Tc', '5d', 'As', '3c', '3s', '2h'], gameForTest);

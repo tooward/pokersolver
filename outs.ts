@@ -132,7 +132,10 @@ export default class HandEvaluator {
       * Card constructor expects values in specific order
       */
       static combineHoleAndCommunity(holeCards: Card[], communityCards: Card[]): Card[] {
-        const allCards = [...holeCards.map(c => new Card(c.value + c.suit + c.rank)), ...communityCards.map(c => new Card(c.value + c.suit + c.rank))];
+        const allCards = [
+          ...holeCards.map(c => new Card(c.value + c.suit)),
+          ...communityCards.map(c => new Card(c.value + c.suit))
+        ];
         return allCards;
       }
 
@@ -487,8 +490,9 @@ export default class HandEvaluator {
      * @param communityCards - An array of community cards (3–5 cards).
      * @returns Array of Out objects; one for each hole card that can form a pair with a missing partner.
      */
+    // Revised outsToPair: Only generate an out for a hole card if its rank beats
+    // the highest community card (because pairing a card that is too low won’t improve the hand).
     static outsToPair(holeCards: Card[], communityCards: Card[]): Out[] {
-      // Validate inputs.
       if (!holeCards || holeCards.length !== 2) {
         throw new Error("Must provide exactly two hole cards");
       }
@@ -496,38 +500,40 @@ export default class HandEvaluator {
         throw new Error("Must provide at least three community cards");
       }
       
-      // Use only the hole cards that are considered over cards.
-      const overCards = HandEvaluator.checkOverCards(holeCards, communityCards);
-      // If at least one hole card is over, use only those; if none, use all.
-      const validHoleCards = overCards.length > 0 ? overCards : holeCards;
-      
       const allCards: Card[] = [...holeCards, ...communityCards];
+      // Determine highest community card rank using the shared values order.
+      const highestCommunityRank = Math.max(...communityCards.map(c => c.rank));
+      
       const outsArray: Out[] = [];
       const suits = ['s', 'h', 'd', 'c'];
       
-      // Process each valid hole card.
+      // Use only the over cards if available; otherwise, use both hole cards.
+      const overCards = HandEvaluator.checkOverCards(holeCards, communityCards);
+      const validHoleCards = overCards.length > 0 ? overCards : holeCards;
+      
       for (const holeCard of validHoleCards) {
-        // Skip if a pair is already present.
-        const count = allCards.filter(c => c.value === holeCard.value).length;
-        if (count >= 2) {
+        // Filter: Only consider hole cards whose rank beats the best on board.
+        if (holeCard.rank <= highestCommunityRank) {
           continue;
         }
+        
+        // Skip if a pair is already on board.
+        const count = allCards.filter(c => c.value === holeCard.value).length;
+        if (count >= 2) continue;
         
         const out = new Out();
         out.outHand = "Pair";
         out.possibleHand = false;
-        out.cardNeededCount = 0;
+        out.cardNeededCount = 1; // Only one card is needed to complete your pair.
         out.cardsHeldForOut.push(holeCard);
         
-        // For each suit other than the one in the hole card,
-        // if that candidate card is not already in play, add it.
+        // For each suit (except the hole card’s suit), if that candidate card is not in play, add it.
         for (const suit of suits) {
           if (suit === holeCard.suit) continue;
           const candidateStr = holeCard.value + suit;
           if (allCards.some(c => c.value + c.suit === candidateStr)) continue;
           
           out.cardsThatCanMakeHand.push(new Card(candidateStr));
-          out.cardNeededCount += 1;
           out.possibleHand = true;
         }
         
@@ -767,91 +773,87 @@ export default class HandEvaluator {
         throw new Error("Community cards must be between 3 and 5");
       }
       
-      const cards = [...holeCards, ...communityCards];
-      if (cards.length < 4) {
+      const allCards = [...holeCards, ...communityCards];
+      if (allCards.length < 4) {
         throw new Error("At least four cards are required to check for an inside straight draw");
       }
       
-      const outArray: Out[] = [];
-      // Use the provided card order or default to standard Texas Hold'em order.
+      // Use the shared card order (or fallback to standard)
       const cardValues = (Array.isArray(values) && values.length > 0)
         ? values
         : ['2','3','4','5','6','7','8','9','T','J','Q','K','A'];
       
-      // Sort cards by rank order (ascending).
-      const sortedCards = [...cards].sort((a, b) => cardValues.indexOf(a.value) - cardValues.indexOf(b.value));
+      // Get unique sorted rank indices from all cards
+      const uniqueRanks = Array.from(new Set(allCards.map(card => cardValues.indexOf(card.value)))).sort((a, b) => a - b);
       
-      // Create a unique list of rank indices from the sorted cards.
-      const uniqueRanks = Array.from(new Set(sortedCards.map(card => cardValues.indexOf(card.value)))).sort((a, b) => a - b);
+      // Build a set of candidate card strings already in play.
+      const inPlay = new Set(allCards.map(card => card.value + card.suit));
       
-      // Helper: given a combination of rank indices, return the held cards (first found per rank) from sortedCards.
-      const getHeldCardsForCombo = (combo: number[]): Card[] => {
-        const held: Card[] = [];
-        for (const rankIndex of combo) {
-          const rankVal = cardValues[rankIndex];
-          const found = sortedCards.find(c => c.value === rankVal);
-          if (found) {
-            held.push(found);
-          }
-        }
-        return held;
-      };
-
-      // Build a set of cards already in play (e.g. "5h", "6d").
-      const inPlay = new Set(cards.map(card => card.value + card.suit));
-      const suits = ['s', 'h', 'd', 'c'];
+      // We'll collect Out objects in a map keyed by the missing rank index so that
+      // for a given missing rank we only return one Out.
+      const resultsMap = new Map<number, Out>();
       
-      // Helper: generate all combinations of k elements from an array.
-      const combinations = (arr: number[], k: number): number[][] => {
-        const results: number[][] = [];
-        const combine = (start: number, combo: number[]) => {
-          if (combo.length === k) {
-            results.push([...combo]);
-            return;
-          }
-          for (let i = start; i < arr.length; i++) {
-            combo.push(arr[i]);
-            combine(i + 1, combo);
-            combo.pop();
-          }
-        };
-        combine(0, []);
-        return results;
-      };
-      
-      // Generate all combinations of 4 rank indices from uniqueRanks.
-      const combos = combinations(uniqueRanks, 4);
-      for (const combo of combos) {
-        const min = Math.min(...combo);
-        const max = Math.max(...combo);
-        // For an inside straight draw (gutshot), the span must be exactly 4.
-        if (max - min === 4) {
-          // In a complete 5-card straight from min to max, one rank will be missing.
-          const fullRange = [];
-          for (let r = min; r <= max; r++) {
-            fullRange.push(r);
-          }
-          const missing = fullRange.filter(r => !combo.includes(r));
-          if (missing.length === 1) {
-            const missingRank = missing[0];
-            // For each suit candidate of the missing rank, if not already in play, create a separate Out.
-            for (const suit of suits) {
-              const candidateStr = cardValues[missingRank] + suit;
+      // Iterate over every possible contiguous block of 5 ranks in the card order.
+      // For an inside/gutshot draw the missing rank must be one of the inner three (not the first or last).
+      for (let start = 0; start <= cardValues.length - 5; start++) {
+        const seq = [start, start + 1, start + 2, start + 3, start + 4];
+        // Determine which ranks from this sequence are present in our hand.
+        const present = seq.filter(rankIdx => uniqueRanks.includes(rankIdx));
+        if (present.length === 4) {
+          // Identify the missing rank in this 5‐card window.
+          const missing = seq.find(r => !present.includes(r));
+          // Only consider an inside draw if the missing index is not at an edge.
+          if (missing !== undefined && missing !== start && missing !== start + 4) {
+            // For the block of present ranks, pick one representative card for each rank.
+            const heldForBlock: Card[] = [];
+            for (const rankIdx of present) {
+              const found = allCards.find(c => cardValues.indexOf(c.value) === rankIdx);
+              if (found) {
+                heldForBlock.push(found);
+              }
+            }
+            
+            // For the missing rank, build candidate cards for any suit not already in play.
+            const candidateCards: Card[] = [];
+            for (const suit of ['s', 'h', 'd', 'c']) {
+              const candidateStr = cardValues[missing] + suit;
               if (!inPlay.has(candidateStr)) {
-                const o = new Out();
-                o.outHand = "Inside Straight Draw";
-                o.possibleHand = true;
-                o.cardNeededCount = 1; // Only one card is needed to complete the draw.
-                o.cardsHeldForOut = getHeldCardsForCombo(combo);
-                o.cardsThatCanMakeHand.push(new Card(candidateStr));
-                outArray.push(o);
+                candidateCards.push(new Card(candidateStr));
+              }
+            }
+            
+            if (candidateCards.length > 0) {
+              // If an Out for this missing rank already exists, merge the data.
+              if (resultsMap.has(missing)) {
+                const existingOut = resultsMap.get(missing)!;
+                // Merge candidate cards (avoid duplicates using toString() for comparison).
+                candidateCards.forEach(cc => {
+                  if (!existingOut.cardsThatCanMakeHand.some(c => c.toString() === cc.toString())) {
+                    existingOut.cardsThatCanMakeHand.push(cc);
+                  }
+                });
+                // Merge held cards.
+                heldForBlock.forEach(hc => {
+                  if (!existingOut.cardsHeldForOut.some(c => c.toString() === hc.toString())) {
+                    existingOut.cardsHeldForOut.push(hc);
+                  }
+                });
+              } else {
+                const out = new Out();
+                out.outHand = "Inside Straight Draw";
+                out.possibleHand = true;
+                out.cardNeededCount = 1;  // Only one card needed to complete the draw.
+                out.cardsHeldForOut = heldForBlock;
+                out.cardsThatCanMakeHand = candidateCards;
+                resultsMap.set(missing, out);
               }
             }
           }
         }
       }
       
-      return outArray;
+      // Return one Out object for each distinct missing rank candidate.
+      return Array.from(resultsMap.values());
     }
 
     /*

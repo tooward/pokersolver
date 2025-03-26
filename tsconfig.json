@@ -13,7 +13,8 @@
     "include": [
         "*.ts",
         "**/*.ts"
-, "pokersolver.ts"    ],
+,       "pokersolver.ts",
+        "outs.ts"    ],
     "exclude": [
         "node_modules"
     ]

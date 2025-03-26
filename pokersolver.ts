@@ -33,7 +33,10 @@ declare var exports: any;
       * Card constructor expects values in specific order
     */
     static combineHoleAndCommunity(holeCards: Card[], communityCards: Card[]): Card[] {
-      const allCards = [...holeCards.map(c => new Card(c.value + c.suit + c.rank)), ...communityCards.map(c => new Card(c.value + c.suit + c.rank))];
+      const allCards = [
+        ...holeCards.map(c => new Card(c.value + c.suit)),
+        ...communityCards.map(c => new Card(c.value + c.suit))
+      ];
       return allCards;
     }
 
@@ -45,7 +48,7 @@ declare var exports: any;
     }
 
     toString(): string {
-      return this.wildValue.replace("T", "10") + this.suit;
+      return this.value + this.suit;
     }
 
     static sort(a: Card, b: Card): number {
