@@ -3,23 +3,6 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.PaiGowPokerHelper = exports.Game = exports.HighCard = exports.OnePair = exports.TwoPair = exports.ThreePair = exports.ThreeOfAKind = exports.TwoThreeOfAKind = exports.Straight = exports.Flush = exports.FullHouse = exports.ThreeOfAKindTwoPair = exports.FourWilds = exports.FourOfAKind = exports.FourOfAKindPairPlus = exports.FiveOfAKind = exports.WildRoyalFlush = exports.NaturalRoyalFlush = exports.RoyalFlush = exports.StraightFlush = exports.Hand = exports.Card = void 0;
 //export { default as HandEvaluator } from './outs';
 const constants_1 = require("./constants");
-// NOTE: The 'joker' will be denoted with a value of 'O' and any suit.
-// export const values: string[] = [
-//   "1",
-//   "2",
-//   "3",
-//   "4",
-//   "5",
-//   "6",
-//   "7",
-//   "8",
-//   "9",
-//   "T",
-//   "J",
-//   "Q",
-//   "K",
-//   "A",
-// ];
 // --------------------------
 // Card class
 // --------------------------

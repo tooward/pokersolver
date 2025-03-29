@@ -451,6 +451,40 @@ function heldCardStrings(outs: any[]): string[] {
 }
 
 describe("HandEvaluator.outsToPair (revised filtering)", () => {
+
+  it("should return one Out object that aggregates candidate cards for a two-pair improvement", () => {
+    // Example: Two pair scenario.
+    // Hole cards: "8s", "8h"
+    // Community cards: "Kc", "Kd", "2h"
+    // Two pair already: Eights and Kings.
+    // The candidate for forming the second pair is the highest non-paired card.
+    // In this case, assume the candidate card is "2" (if no other candidate exists)
+    // and its missing suits will be all suits not already in play for that rank.
+    const holeCards = [new Card("8s"), new Card("8h")];
+    const communityCards = [new Card("Kc"), new Card("Kd"), new Card("2h")];
+    
+    const outs = HandEvaluator.outsToTwoPair(holeCards, communityCards);
+    // We expect one Out object.
+    expect(outs).to.be.an("array").with.lengthOf(1);
+    
+    const out = outs[0];
+    expect(out.outHand).to.equal("Two Pair");
+    expect(out.possibleHand).to.be.true;
+    expect(out.cardNeededCount).to.equal(1);
+    
+    // The candidate should be for the highest non-paired card.
+    // In our example, the only non-paired rank is "2" (from community).
+    // The held cards for the candidate should include "2h".
+    const heldStr = out.cardsHeldForOut.map(c => c.toString());
+    expect(heldStr).to.include("2h");
+    
+    // The cards that can make the hand should aggregate all candidate cards for rank "2"
+    // by missing suit. The expected candidate cards are those in which suit is not "h".
+    const candidateStr = out.cardsThatCanMakeHand.map(c => c.toString()).sort();
+    const expectedCandidates = ["2s", "2d", "2c"].sort();
+    expect(candidateStr).to.deep.equal(expectedCandidates);
+  });
+
   it("should generate outs for both hole cards when both are over the board", () => {
     // Community cards have relatively low ranks.
     // Example: community: "2h", "3c", "Td" (highest is T)
@@ -531,172 +565,144 @@ describe("HandEvaluator.outsToPair (revised filtering)", () => {
   });
 });
 
-describe("outsToTwoPair", () => {
+describe("HandEvaluator.outsToTwoPair", () => {
+  it("should throw an error when fewer than three community cards are provided", () => {
+    const holeCards = [new Card("As"), new Card("Kh")];
+    const communityCards = [new Card("2h"), new Card("3c")]; // only 2 cards
+    expect(() => {
+      HandEvaluator.outsToTwoPair(holeCards, communityCards);
+    }).to.throw("Community cards must be between 3 and 5");
+  });
 
-  describe("HandEvaluator.outsToTwoPair", () => {
-    it("should form correct Out objects for two pair improvement", () => {
-      // Setup:
-      // The full hand has a pair of 8's: hole card "8s" with community card "8d"
-      // and a candidate card "Kh" from the hole that can form the second pair.
-      // Other community cards are "Qc" and "Js".
-      // Because "Kh" is in play, the missing King suits are expected to be: Ks, Kc, and Kd.
-      const holeCards = [new Card("Kh"), new Card("8s")];
-      const communityCards = [new Card("8d"), new Card("Qc"), new Card("Js")];
-      
-      const outs = HandEvaluator.outsToTwoPair(holeCards, communityCards);
-      
-      // Expect three Out objects – one for each missing suit candidate for "K"
-      expect(outs).to.be.an("array").with.lengthOf(3);
-      
-      // Combine the candidate cards (from cardsThatCanMakeHand on each Out)
-      const candidateCards = outs
-        .map((out: Out) => out.cardsThatCanMakeHand[0].toString())
-        .sort();
-      
-      // Expect the three candidate King cards to be present (order doesn't matter)
-      expect(candidateCards).to.deep.equal(["Kc", "Kd", "Ks"]);
-      
-      // Check each Out object for proper properties.
-      outs.forEach((out: Out) => {
-        expect(out.outHand).to.equal("Two Pair");
-        expect(out.possibleHand).to.be.true;
-        expect(out.cardNeededCount).to.equal(1);
-        
-        // The held card used for making the pair should be the candidate card "Kh"
-        const heldCards = out.cardsHeldForOut.map(c => c.toString());
-        expect(heldCards).to.include("Kh");
-        
-        // Each Out should have exactly one candidate card in cardsThatCanMakeHand.
-        expect(out.cardsThatCanMakeHand).to.be.an("array").with.lengthOf(1);
-        // And that candidate should be a King with a suit different from "h"
-        const candidate = out.cardsThatCanMakeHand[0];
-        expect(candidate.value).to.equal("K");
-        expect(candidate.suit).to.not.equal("h");
-      });
-    });
-  });
-  
-  it("should return possibleHand false when there is no pair in the full hand", () => {
-    // Create a high card hand (no pair)
-    const holeCards = ["As", "Kd"].map(c => new Card(c));
-    const communityCards = ["Qh", "Jc", "9s"].map(c => new Card(c));
-    const result = HandEvaluator.outsToTwoPair(holeCards, communityCards);
-    expect(result).to.be.an("array").that.is.empty;
-  });
-  
-  it("should evaluate outs for a one-pair hand", () => {
-    // For example: a pair of 8's with three other cards.
-    // Hand: HoleCards: 8s, 8h; Community: Kc, 4d, 2s.
-    // The pair is 8's. The candidate for second pair is the highest non-pair, here expected to be Kc.
-    // Missing candidate suits for "K" (given Kc is in play) should be: "Kh", "Ks", "Kd".
-    const holeCards = ["8s", "8h"].map(c => new Card(c));
-    const communityCards = ["Kc", "4d", "2s"].map(c => new Card(c));
-    
-    const results = HandEvaluator.outsToTwoPair(holeCards, communityCards);
-    expect(results).to.be.an("array").that.has.lengthOf(3);
-    results.forEach(out => {
-      expect(out.outHand).to.equal("Two Pair");
-      expect(out.possibleHand).to.be.true;
-      // Now each out requires only one card to complete the improvement.
-      expect(out.cardNeededCount).to.equal(1);
-    });
-    
-    // Verify that the candidate outs are exactly "Kh", "Ks", and "Kd".
-    const candidateOuts = results.map(out => out.cardsThatCanMakeHand[0].toString()).sort();
-    const expected = ["Kh", "Ks", "Kd"].sort();
-    expect(candidateOuts).to.deep.equal(expected);
-  });
-  
-  it("should return possibleHand false when the full hand already is two pair", () => {
-    // Hand already has two pair: 
-    // HoleCards: 8s, 8h; Community: Kc, Kd, 2s.
-    const holeCards = ["8s", "8h"].map(c => new Card(c));
-    const communityCards = ["Kc", "Kd", "2s"].map(c => new Card(c));
-    const results = HandEvaluator.outsToTwoPair(holeCards, communityCards);
-    expect(results).to.be.an("array").that.is.empty;
-  });
-  
-  it("should return Out with no outs if the candidate card already appears in all suits", () => {
-    // Combine holeCards: 7s, 7h; Community: Kc, Kh, Kd, Ks.
-    const holeCards = ["7s", "7h"].map(c => new Card(c));
-    const communityCards = ["Kc", "Kh", "Kd", "Ks"].map(c => new Card(c));
-    const results = HandEvaluator.outsToTwoPair(holeCards, communityCards);
-    expect(results).to.be.an("array").that.is.empty;
-  });
-  
-  it("should throw an error if holeCards array does not have exactly two cards", () => {
-    const holeCards = ["As"].map(c => new Card(c));
-    const communityCards = ["Qh", "Jc", "9s"].map(c => new Card(c));
+  it("should throw an error when hole cards array does not have exactly two cards", () => {
+    const holeCards = [new Card("As")]; // only one hole card
+    const communityCards = [new Card("2h"), new Card("3c"), new Card("Td")];
     expect(() => {
       HandEvaluator.outsToTwoPair(holeCards, communityCards);
     }).to.throw("Must provide exactly two hole cards");
   });
-  
-  it("should throw an error if communityCards array is not between 3 and 5 cards", () => {
-    const holeCards = ["As", "Kd"].map(c => new Card(c));
-    const communityCards = ["Qh", "Jc"].map(c => new Card(c)); // only 2 cards
-    expect(() => {
-      HandEvaluator.outsToTwoPair(holeCards, communityCards);
-    }).to.throw("Community cards must be between 3 and 5");
+
+  it("should return an empty array if no candidate pair exists", () => {
+    // No pair is present in the full hand.
+    const holeCards = [new Card("As"), new Card("Kd")];
+    const communityCards = [new Card("Qh"), new Card("Jc"), new Card("9s")];
+    const outs = HandEvaluator.outsToTwoPair(holeCards, communityCards);
+    expect(outs).to.be.an("array").that.is.empty;
+  });
+
+  it("should return one Out object aggregating candidate cards for a two-pair improvement", () => {
+    // Setup:
+    // Hole cards: "8s", "8h" (forming the candidate pair)
+    // Community cards: "Kc", "Kd", "2h"
+    //
+    // In this hand, the board shows a pair of Kings.
+    // Excluding the candidate pair ("8"), the only non-paired card is "2h".
+    // Therefore, "2" becomes the candidate to form the second pair.
+    // Since "2h" is already in play, its missing suits should be: "2c", "2d", and "2s".
+    const holeCards = [new Card("8s"), new Card("8h")];
+    const communityCards = [new Card("Kc"), new Card("Kd"), new Card("2h")];
+    const outs = HandEvaluator.outsToTwoPair(holeCards, communityCards);
+    expect(outs).to.be.an("array").with.lengthOf(1);
+    
+    const out = outs[0];
+    expect(out.outHand).to.equal("Two Pair");
+    expect(out.possibleHand).to.be.true;
+    expect(out.cardNeededCount).to.equal(1);
+
+    // Verify that the held cards in the Out come from the board candidate.
+    // In our example, the candidate card is the non-paired "2h".
+    const heldCards = out.cardsHeldForOut.map(c => c.toString());
+    expect(heldCards).to.deep.equal(["2h"]);
+
+    // Verify that the aggregated candidate outs for value "2" include all missing suits.
+    // Since "2h" is already present, the missing candidate cards should be "2c", "2d", and "2s".
+    const candidateCards = out.cardsThatCanMakeHand.map(c => c.toString()).sort();
+    expect(candidateCards).to.deep.equal(["2c", "2d", "2s"].sort());
+  });
+
+  it("should select the highest candidate among non-paired cards", () => {
+    // In this test, more than one candidate value is available.
+    // Setup:
+    // Hole cards: "8s", "8h" (pair of 8's).
+    // Community cards: "Kc", "3d", "2h".
+    //
+    // Candidate values (from non-paired cards) are "K", "3", and "2".
+    // Using the authoritative order (["1","2","3","4","5","6","7","8","9","T","J","Q","K","A"]),
+    // "K" is the highest. Therefore, the candidate becomes "K".
+    // The held card for the candidate will be "Kc" from the board.
+    // Candidate outs for "K" will be: missing suits {if "Kc" is in play, then "Kd", "Kh", and "Ks"}.
+    const holeCards = [new Card("8s"), new Card("8h")];
+    const communityCards = [new Card("Kc"), new Card("3d"), new Card("2h")];
+    const outs = HandEvaluator.outsToTwoPair(holeCards, communityCards);
+    expect(outs).to.be.an("array").with.lengthOf(1);
+    
+    const out = outs[0];
+    // The candidate should be "K" since it is the highest among {"K","3","2"}.
+    const held = out.cardsHeldForOut.map(c => c.toString());
+    expect(held).to.deep.equal(["Kc"]);
+    const candidates = out.cardsThatCanMakeHand.map(c => c.toString()).sort();
+    expect(candidates).to.deep.equal(["Kd", "Kh", "Ks"].sort());
   });
 });
 
 describe("HandEvaluator.outsToThreeKind", () => {
 
-  it("should return correct Out objects for three-of-a-kind improvement", () => {
-    // Setup a hand with exactly a pair of 8's.
-    // Hole cards: "8s" and "Kh"
+  it("should return a single Out object aggregating candidate cards with correct cardsNeeded and cardsHeldForOut", () => {
+    // Setup:
+    // Hole cards: "8s", "Kh"
     // Community cards: "8d", "Qc", "Js"
-    // This means the pair is 8's (present suits: "s" and "d"), so the missing candidate suits are "c" and "h".
+    // The pair is "8" (from hole "8s" and community "8d").
+    // The missing suits for the "8" are those not present among the pair.
+    // Here "8s" and "8d" are held; therefore, the missing candidate cards should be "8c" and "8h".
     const holeCards = [new Card("8s"), new Card("Kh")];
     const communityCards = [new Card("8d"), new Card("Qc"), new Card("Js")];
     
     const results = HandEvaluator.outsToThreeKind(holeCards, communityCards);
     
-    // Expect 2 Out objects corresponding to the two missing 8's ("8c" and "8h")
-    expect(results).to.be.an("array").with.lengthOf(2);
+    // Expect a single Out object.
+    expect(results).to.be.an("array").with.lengthOf(1);
+    const out = results[0];
     
-    // Extract candidate card strings from each Out.
-    const candidateCards = results
-      .map((out: Out) => out.cardsThatCanMakeHand[0].toString())
-      .sort();
-    expect(candidateCards).to.deep.equal(["8c", "8h"]);
+    // Verify the hand type is set correctly.
+    expect(out.outHand).to.equal("Three of a Kind");
+    expect(out.possibleHand).to.be.true;
     
-    results.forEach((out: Out) => {
-      // Check properties of each Out.
-      expect(out.outHand).to.equal("Three of a Kind");
-      expect(out.possibleHand).to.be.true;
-      expect(out.cardNeededCount).to.equal(1);
-      
-      // The held cards should be the two 8's.
-      const heldCards = out.cardsHeldForOut.map(c => c.toString()).sort();
-      expect(heldCards).to.deep.equal(["8d", "8s"]);
-      
-      // The candidate card should have value "8" and a suit that is one of the missing suits.
-      const candidate = out.cardsThatCanMakeHand[0];
-      expect(candidate.value).to.equal("8");
-      expect(["c", "h"]).to.include(candidate.suit);
-    });
+    // Verify that cardNeededCount reflects the number of cards needed to complete the hand (should be 1).
+    expect(out.cardNeededCount).to.equal(1);
+    
+    // Verify that cardsHeldForOut contains the specific pair cards that form the basis of the improvement.
+    const heldCards = out.cardsHeldForOut.map(c => c.toString()).sort();
+    expect(heldCards).to.deep.equal(["8s", "8d"].sort());
+    
+    // Verify that candidate outs aggregate the missing "8" cards for the pair.
+    // Since "8s" and "8d" are held, the missing candidate cards should be "8c" and "8h".
+    const candidateCards = out.cardsThatCanMakeHand.map(c => c.toString()).sort();
+    expect(candidateCards).to.deep.equal(["8c", "8h"].sort());
   });
 
-  it("should return outs for a hand with a valid pair (one out per missing suit)", () => {
+  it("should return outs for a hand with a valid pair (aggregated candidate out)", () => {
     // Example: HoleCards: ['As', '7h'], CommunityCards: ['Ad', '2h', '3c']
     // The pair is Aces (As and Ad). Missing suits for Aces are 'Ah' and 'Ac'.
     const holeCards = ["As", "7h"].map(c => new Card(c));
     const communityCards = ["Ad", "2h", "3c"].map(c => new Card(c));
-    
+  
     const results = HandEvaluator.outsToThreeKind(holeCards, communityCards);
-    
-    expect(results).to.be.an("array").that.has.lengthOf(2);
-    results.forEach(out => {
-      expect(out.outHand).to.equal("Three of a Kind");
-      expect(out.possibleHand).to.be.true;
-      expect(out.cardNeededCount).to.equal(1);
-      // cardsHeldForOut should contain the two Ace cards.
-      expect(out.cardsHeldForOut.map(c => c.toString())).to.include("As").and.to.include.members(["Ad"]);
-    });
-    
-    const candidateOuts = results.map(o => o.cardsThatCanMakeHand[0].toString()).sort();
+  
+    // Expect a single Out object.
+    expect(results).to.be.an("array").that.has.lengthOf(1);
+    const out = results[0];
+  
+    // Verify the hand type is set correctly.
+    expect(out.outHand).to.equal("Three of a Kind");
+    expect(out.possibleHand).to.be.true;
+    expect(out.cardNeededCount).to.equal(1);
+  
+    // cardsHeldForOut should contain both Ace cards ("As" and "Ad").
+    const heldCards = out.cardsHeldForOut.map(c => c.toString()).sort();
+    expect(heldCards).to.deep.equal(["As", "Ad"].sort());
+  
+    // The candidate outs should aggregate the missing Ace candidate cards: "Ah" and "Ac".
+    const candidateOuts = out.cardsThatCanMakeHand.map(c => c.toString()).sort();
     expect(candidateOuts).to.deep.equal(["Ah", "Ac"].sort());
   });
 

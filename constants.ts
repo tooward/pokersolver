@@ -1,3 +1,4 @@
+// NOTE: The 'joker' will be denoted with a value of 'O' and any suit.
 export const values: string[] = [
     "1",
     "2",

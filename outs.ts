@@ -2,37 +2,6 @@
 import { Card, Hand, Game } from './pokersolver';
 import { values } from './constants';
 
-// Define card values in ascending order (same as in pokersolver)
-// const values = {
-//     '2': 0,
-//     '3': 1,
-//     '4': 2,
-//     '5': 3,
-//     '6': 4,
-//     '7': 5,
-//     '8': 6,
-//     '9': 7,
-//     'T': 8,
-//     'J': 9,
-//     'Q': 10,
-//     'K': 11,
-//     'A': 12
-//   };
-
-  // const gameRules: { [key: string]: GameRule } = {
-  //   standard: {
-  //     cardsInHand: 5,
-  //     handValues: [
-  //       StraightFlush,
-  //       FourOfAKind,
-  //       FullHouse,
-  //       Flush,
-  //       Straight,
-  //       ThreeOfAKind,
-  //       TwoPair,
-  //       OnePair,
-  //       HighCard,
-  //     ],
 
 export enum PokerError {
   PreflopNotAllowed = "PRE_FLOP_NOT_ALLOWED",
@@ -566,51 +535,70 @@ export default class HandEvaluator {
       if (!communityCards || communityCards.length < 3 || communityCards.length > 5) {
         throw new Error("Community cards must be between 3 and 5");
       }
-
-      const allCards: Card[] = [...holeCards, ...communityCards];
-      // Count occurrences by rank.
-      const rankCount: { [val: string]: number } = {};
-      for (const card of allCards) {
-        rankCount[card.value] = (rankCount[card.value] || 0) + 1;
+      
+      const allCards = [...holeCards, ...communityCards];
+    
+      // Determine the candidate pair.
+      // Prefer a pair from the hole cards; otherwise, see if a hole card pairs exactly once with community.
+      let candidatePair: string | null = null;
+      if (holeCards[0].value === holeCards[1].value) {
+        candidatePair = holeCards[0].value;
+      } else {
+        for (const card of holeCards) {
+          const count = allCards.filter(c => c.value === card.value).length;
+          if (count === 2) {
+            candidatePair = card.value;
+            break;
+          }
+        }
       }
-      // Determine ranks that are paired (count >= 2)
-      const pairValues = Object.keys(rankCount).filter(val => rankCount[val] >= 2);
-      // For two pair improvement, we expect exactly one pair already.
-      if (pairValues.length !== 1) {
+      if (!candidatePair) {
         return [];
       }
-      const existingPair = pairValues[0];
-
-      // Create a sorted copy of the full hand (using Card.sort, descending order).
-      const sortedCards = allCards.slice().sort(Card.sort);
-      // Extract non-paired cards.
-      const nonPairCards = sortedCards.filter(card => card.value !== existingPair);
-      if (nonPairCards.length === 0) return [];
-      // Use the highest non-paired card as the candidate for forming the second pair.
-      const candidate = nonPairCards[0];
-      // Determine which suits of the candidate value are already in play.
+    
+      // From all cards (excluding the candidate pair), gather candidate values
+      // that appear only once in the community cards.
+      const candidateValues: string[] = [];
+      for (const card of allCards) {
+        if (card.value !== candidatePair) {
+          const communityCount = communityCards.filter(c => c.value === card.value).length;
+          if (communityCount < 2) {
+            candidateValues.push(card.value);
+          }
+        }
+      }
+      // Get unique candidate values.
+      const uniqueCandidates = Array.from(new Set(candidateValues));
+      if (uniqueCandidates.length === 0) {
+        return [];
+      }
+      
+      // Sort the unique candidate values in descending order using our authoritative order.
+      uniqueCandidates.sort((a, b) => values.indexOf(b) - values.indexOf(a));
+      const candidate = uniqueCandidates[0];
+      
+      // Determine which suits for the candidate card are already in play.
+      const inPlaySuits = new Set(allCards.filter(c => c.value === candidate).map(c => c.suit));
       const allSuits = ['s', 'h', 'd', 'c'];
-      const presentSuits = new Set(
-        allCards.filter(card => card.value === candidate.value).map(card => card.suit)
-      );
-      const missingSuits = allSuits.filter(suit => !presentSuits.has(suit));
-
-      // For each missing suit, create an Out object.
-      const outs: Out[] = [];
-      missingSuits.forEach(suit => {
-        const out = new Out();
-        out.outHand = "Two Pair";
-        out.possibleHand = true;
-        // Since only one card is needed from this candidate to form a pair,
-        // we now set cardNeededCount to 1.
-        out.cardNeededCount = 1;
-        out.cardsThatCanMakeHand.push(new Card(candidate.value + suit));
-        // Also record the cards already in hand contributing to the candidate.
-        out.cardsHeldForOut = allCards.filter(card => card.value === candidate.value);
-        outs.push(out);
-      });
-
-      return outs;
+      const missingSuits = allSuits.filter(suit => !inPlaySuits.has(suit));
+      if (missingSuits.length === 0) {
+        return [];
+      }
+      
+      // Create candidate cards for missing suits.
+      const candidateCards: Card[] = missingSuits.map(suit => new Card(candidate + suit));
+      
+      // Build one Out object.
+      // The held cards for this candidate are all cards with the candidate value.
+      const heldForCandidate = allCards.filter(c => c.value === candidate);
+      const outCandidate = new Out();
+      outCandidate.outHand = "Two Pair";
+      outCandidate.possibleHand = true;
+      outCandidate.cardNeededCount = 1;
+      outCandidate.cardsHeldForOut = heldForCandidate;
+      outCandidate.cardsThatCanMakeHand = candidateCards;
+      
+      return [outCandidate];
     }
 
     /**
@@ -655,24 +643,22 @@ export default class HandEvaluator {
       const cardsHeld = allCards.filter(card => card.value === pairValue);
       
       // For three-of-a-kind, one extra card (of the pair's value) is needed.
-      // Iterate over all suits to see which ones are missing.
+      // Determine which suits are missing.
       const allSuits = ['s', 'h', 'd', 'c'];
       const presentSuits = new Set(cardsHeld.map(card => card.suit));
       const missingSuits = allSuits.filter(suit => !presentSuits.has(suit));
       
-      const outsArray: Out[] = [];
-      missingSuits.forEach(suit => {
-        const out = new Out();
-        out.outHand = "Three of a Kind";
-        out.possibleHand = true;
-        out.cardNeededCount = 1;
-        out.cardsThatCanMakeHand.push(new Card(pairValue + suit));
-        // Record which cards are held that form the pair.
-        out.cardsHeldForOut = cardsHeld;
-        outsArray.push(out);
-      });
+      if (missingSuits.length === 0) return [];
       
-      return outsArray;
+      // Build one Out object that aggregates candidate cards for the improvement.
+      const outCandidate = new Out();
+      outCandidate.outHand = "Three of a Kind";
+      outCandidate.possibleHand = true;
+      outCandidate.cardNeededCount = 1;
+      outCandidate.cardsHeldForOut = cardsHeld;
+      outCandidate.cardsThatCanMakeHand = missingSuits.map(suit => new Card(pairValue + suit));
+      
+      return [outCandidate];
     }
 
     /**
