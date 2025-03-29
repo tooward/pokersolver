@@ -1,23 +1,25 @@
-export { default as HandEvaluator } from './outs';
+//export { default as HandEvaluator } from './outs';
+import { values } from './constants';
+
 declare var exports: any;
 
 // NOTE: The 'joker' will be denoted with a value of 'O' and any suit.
-  export const values: string[] = [
-    "1",
-    "2",
-    "3",
-    "4",
-    "5",
-    "6",
-    "7",
-    "8",
-    "9",
-    "T",
-    "J",
-    "Q",
-    "K",
-    "A",
-  ];
+  // export const values: string[] = [
+  //   "1",
+  //   "2",
+  //   "3",
+  //   "4",
+  //   "5",
+  //   "6",
+  //   "7",
+  //   "8",
+  //   "9",
+  //   "T",
+  //   "J",
+  //   "Q",
+  //   "K",
+  //   "A",
+  // ];
 
   // --------------------------
   // Card class
@@ -41,10 +43,10 @@ declare var exports: any;
     }
 
     constructor(str: string) {
-      this.value = str.substr(0, 1);
-      this.suit = str.substr(1, 1).toLowerCase();
+      this.value = str.slice(0, 1);
+      this.suit = str.slice(1, 2).toLowerCase();
       this.rank = values.indexOf(this.value);
-      this.wildValue = str.substr(0, 1);
+      this.wildValue = str.slice(0, 1);
     }
 
     toString(): string {
