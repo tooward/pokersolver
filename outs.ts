@@ -35,6 +35,50 @@ export class Outs {
   };
 }
 
+/**
+* # Board Texture
+* 
+* **Paired** 
+* Two or more cards of the same rank on the board.
+* Implications:
+	•	Increases the chance of full houses or trips.
+	•	Can slow down action if players are cautious of someone holding trips.
+	•	Good bluffing opportunities if you’re representing the trips.
+  
+**Monotone**
+All cards on the board are of the same suit.
+Implications:
+	•	Immediate concern about a flush.
+	•	Players with just one suited card might have a flush draw.
+	•	Very polarizing — someone either has the flush or is drawing/bluffing.
+
+**Two Tone**
+Two suits are present on the board.
+Implications:
+	•	Immediate concern about a flush.
+	•	Players with just one suited card might have a flush draw.
+	•	Very polarizing — someone either has the flush or is drawing/bluffing.
+
+**Connectivity**
+The degree of connection between the cards on the board.
+Implications:
+	•	Good for straight draws, combo draws.
+	•	Very relevant in hands involving suited connectors or low pairs.
+	•	Can change significantly by the turn/river.
+
+
+**Straight Draw**
+The type of straight draw present on the board.
+Implications:
+	•	Increases semi-bluffing range.
+	•	Turn/river may complete or miss draws, affecting betting patterns.
+  
+**Flush Draw**
+The presence of a flush draw on the board.
+Implications:
+	•	Players with suited hands may continue aggressively.
+	•	If the turn or river adds the third suit card, flushes become possible.
+*/
 export interface BoardTexture {
   paired: boolean
   monotone: boolean
@@ -683,59 +727,58 @@ export default class HandEvaluator {
       if (allCards.length < 5)
         throw new Error("At least five cards are required to evaluate an open ended straight draw");
       
-      // Use provided card values or fallback to standard order.
-      // const cardValues = (Array.isArray(values) && values.length > 0)
-      //   ? values
-      //   : ['2', '3', '4', '5', '6', '7', '8', '9', 'T', 'J', 'Q', 'K', 'A'];
-      const cardValues = values;
-
-      // Sort cards by rank order.
-      const sortedCards = [...allCards].sort((a, b) => cardValues.indexOf(a.value) - cardValues.indexOf(b.value));
+      // Use the authoritative order from constants.
+      const cardValues = values; // e.g., ["1","2","3","4","5","6","7","8","9","T","J","Q","K","A"]
       
-      // Create a unique set of rank indices.
-      const uniqueRanks = Array.from(new Set(sortedCards.map(card => cardValues.indexOf(card.value)))).sort((a, b) => a - b);
+      // Get unique rank indices present in the hand.
+      const uniqueRankIndices = Array.from(new Set(allCards.map(card => cardValues.indexOf(card.value)))).sort((a, b) => a - b);
       
+      // Check if a straight is already made: if any five consecutive indices exist.
+      for (let i = 0; i <= uniqueRankIndices.length - 5; i++) {
+        if (uniqueRankIndices[i + 4] - uniqueRankIndices[i] === 4) {
+          // Hand already makes a straight; return empty outs.
+          return [];
+        }
+      }
+      
+      // Now proceed with evaluating an open-ended straight draw.
+      // Identify all contiguous 4-card blocks in the hand.
       const results: Out[] = [];
       const suits = ['s', 'h', 'd', 'c'];
-      const inPlay = new Set(allCards.map(card => card.value + card.suit));
-      
-      // Helper to get held cards from a block (the cards that are already in the contiguous sequence).
-      const getHeldCardsForBlock = (block: number[]): Card[] => {
-        const held: Card[] = [];
-        for (const rankIndex of block) {
-          const cardVal = cardValues[rankIndex];
-          const card = sortedCards.find(c => c.value === cardVal);
-          if (card) held.push(card);
-        }
-        return held;
-      };
-      
-      // Look for any contiguous block of 4 ranks.
-      for (let i = 0; i <= uniqueRanks.length - 4; i++) {
-        const block = uniqueRanks.slice(i, i + 4);
-        if (block[3] - block[0] === 3) {
-          const heldForBlock = getHeldCardsForBlock(block);
-          // Candidate missing ranks: one below and one above the current block (if in range).
-          const candidateMissingIndices: number[] = [];
-          if (block[0] > 0) candidateMissingIndices.push(block[0] - 1);
-          if (block[3] < cardValues.length - 1) candidateMissingIndices.push(block[3] + 1);
-          const missingIndices = Array.from(new Set(candidateMissingIndices));
-          
-          missingIndices.forEach(missingIndex => {
-            const missingValue = cardValues[missingIndex];
-            suits.forEach(suit => {
-              const candidateStr = missingValue + suit;
-              if (!inPlay.has(candidateStr)) {
-                const outCandidate = new Out();
-                outCandidate.outHand = "Straight (OESD)";
-                outCandidate.possibleHand = true;
-                outCandidate.cardsHeldForOut = heldForBlock;
-                outCandidate.cardsThatCanMakeHand.push(new Card(candidateStr));
-                outCandidate.cardNeededCount = 1;
-                results.push(outCandidate);
+      // We'll try every possible 5-card span in cardValues.
+      for (let start = 0; start <= cardValues.length - 5; start++) {
+        const span = [start, start + 1, start + 2, start + 3, start + 4];
+        // Count how many of these ranks are present.
+        const present = span.filter(idx => uniqueRankIndices.includes(idx));
+        if (present.length === 4) {
+          // Identify the missing index.
+          const missing = span.find(idx => !present.includes(idx));
+          if (missing !== undefined) {
+            // Get held cards: all cards in the span that are present.
+            const heldForBlock: Card[] = [];
+            span.forEach(idx => {
+              if (uniqueRankIndices.includes(idx)) {
+                // Add one card of that rank from allCards.
+                const found = allCards.find(card => card.value === cardValues[idx]);
+                if (found && !heldForBlock.some(c => c.toString() === found.toString()))
+                  heldForBlock.push(found);
               }
             });
-          });
+            // For each suit candidate for the missing rank, create an Out.
+            suits.forEach(suit => {
+              const candidateRank = cardValues[missing];
+              if (candidateRank === "1") return;  // skip "1"
+              const candidateStr = candidateRank + suit;
+              if (allCards.some(card => card.toString() === candidateStr)) return;
+              const outCandidate = new Out();
+              outCandidate.outHand = "Straight (OESD)";
+              outCandidate.possibleHand = true;
+              outCandidate.cardNeededCount = 1;
+              outCandidate.cardsHeldForOut = heldForBlock.slice();
+              outCandidate.cardsThatCanMakeHand.push(new Card(candidateStr));
+              results.push(outCandidate);
+            });
+          }
         }
       }
       
@@ -804,7 +847,9 @@ export default class HandEvaluator {
             // Instead of pushing an Out for every candidate suit, do:
             const candidateCards: Card[] = [];
             for (const suit of suits) {
-              const candidateStr = cardValues[missing] + suit;
+              const candidateRank = cardValues[missing];
+              if (candidateRank === "1") continue; // skip rank "1"
+              const candidateStr = candidateRank + suit;
               if (!inPlay.has(candidateStr)) {
                 candidateCards.push(new Card(candidateStr));
               }
@@ -833,48 +878,49 @@ export default class HandEvaluator {
       • Each Out returns only that candidate card, sets cardNeededCount to 1 (because only one card is needed to complete the flush) and populates cardsHeldForOut with the flush-draw cards.
     */
       static outsToFlush(holeCards: Card[], communityCards: Card[]): Out[] {
-        // Validate inputs.
         if (!holeCards || holeCards.length !== 2) {
           throw new Error("Must provide exactly two hole cards");
         }
         if (!communityCards || communityCards.length < 3 || communityCards.length > 5) {
           throw new Error("Community cards must be between 3 and 5");
         }
-      
-        // Combine hole cards and community cards.
+        
         const allCards: Card[] = [...holeCards, ...communityCards];
-        const cardValues = values;
+        // Use the authoritative rank order.
+        const cardValues = values; // e.g., ["2","3","4","5","6","7","8","9","T","J","Q","K","A"] 
         const suits = ['s', 'h', 'd', 'c'];
         const outArray: Out[] = [];
-      
-        // For each suit, check if there's a flush draw 
-        // (defined as exactly 4 cards in that suit).
+        
+        // For each suit, check if exactly 4 cards are present (indicating a flush draw).
         for (const suit of suits) {
           const suitCards = allCards.filter(card => card.suit === suit);
           if (suitCards.length === 4) {
-            // We have a flush draw for the given suit.
-            // For each rank in our order, if a card with that rank and suit is missing,
-            // create an Out candidate.
+            // Build candidate cards by iterating over the cardValues.
+            const candidateCards: Card[] = [];
             for (const rank of cardValues) {
-              // Recommendation 2: Filter out the "1" if present.
+              // Skip the "1" rank (if present in your values array).
               if (rank === "1") continue;
+              // If a card with the rank and suit is not already in play, add it.
               if (!allCards.some(card => card.value === rank && card.suit === suit)) {
-                const candidate = new Card(rank + suit);
-                const outCandidate = new Out();
-                outCandidate.outHand = "Flush";
-                outCandidate.possibleHand = true;
-                // Only one card is needed to complete the flush.
-                outCandidate.cardNeededCount = 1;
-                // Record this candidate card.
-                outCandidate.cardsThatCanMakeHand.push(candidate);
-                // Record the held cards that make up the flush draw.
-                outCandidate.cardsHeldForOut = suitCards.slice();
-                outArray.push(outCandidate);
+                candidateCards.push(new Card(rank + suit));
               }
             }
+            
+            // Create a single Out object for this flush draw.
+            const outCandidate = new Out();
+            outCandidate.outHand = "Flush";
+            outCandidate.possibleHand = true;
+            // Only one card is needed to complete the flush draw.
+            outCandidate.cardNeededCount = 1;
+            // The held cards are the cards in this suit (already in play).
+            outCandidate.cardsHeldForOut = suitCards;
+            // Aggregate all candidate cards (missing from the hand) for completion.
+            outCandidate.cardsThatCanMakeHand = candidateCards;
+            
+            outArray.push(outCandidate);
           }
         }
-      
+        
         return outArray;
       }
 

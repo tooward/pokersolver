@@ -647,6 +647,31 @@ describe("HandEvaluator.outsToTwoPair", () => {
 
 describe("HandEvaluator.outsToThreeKind", () => {
 
+  it("should return an Outs object with correctly formatted out objects", () => {
+    // In this scenario, an Ace-high and Ten-high are in the hole.
+    // Expected: two candidate outs (one for pairing with the Ace and one for pairing with the Ten).
+    // The overall highest out hand type should be "Pair" and the combined output
+    // should have total 6 candidate out cards.
+    const hole = ["As", "Ts"].map(c => new Card(c));
+    const community = ["9h", "7d", "2c"].map(c => new Card(c));
+    
+    const result = HandEvaluator.calculateOuts(hole, community);
+    
+    // Verify that highestOutHand is "Pair"
+    expect(result.highestOutHand).to.equal("Pair");
+    
+    // Verify that exactly two Out objects are returned (one per eligible candidate)
+    expect(result.outs).to.be.an("array").with.lengthOf(2);
+    
+    // Verify that each Out object requires exactly one card to complete the improvement
+    result.outs.forEach(out => {
+      expect(out.cardNeededCount).to.equal(1);
+    });
+    
+    // Verify that the aggregated outCards field has a total of 6 candidate cards
+    expect(result.outCards).to.be.an("array").with.lengthOf(6);
+  });
+
   it("should return a single Out object aggregating candidate cards with correct cardsNeeded and cardsHeldForOut", () => {
     // Setup:
     // Hole cards: "8s", "Kh"
@@ -968,66 +993,95 @@ describe("HandEvaluator.outsToInsideStraightDraw (revised)", () => {
 
 describe("HandEvaluator.outsToFlush", () => {
 
-  it("should return correct Out objects for a flush draw", () => {
-    // Setup: Create a flush draw in hearts.
-    // Hole cards: "Ah" and "Ks" (only "Ah" is heart).
-    // Community cards: "Qh", "Jh", "3h" (all hearts).
-    // Total hearts in play: "Ah", "Qh", "Jh", "3h" (4 cards).  
-    // The missing heart candidates are, per standard order:
-    // ["2h", "4h", "5h", "6h", "7h", "8h", "9h", "Th", "Kh"].
+  it("should return a single Out object for a flush draw with aggregated candidate outs", () => {
+    // Setup a flush draw scenario:
+    // Hole cards: "Ah", "Ks" (only one heart present in hole)
+    // Community cards: "Qh", "Jh", "3h" (all hearts)
+    // Combined, hearts in play are: "Ah", "Qh", "Jh", "3h" (exactly 4 cards → flush draw)
     const holeCards = [new Card("Ah"), new Card("Ks")];
     const communityCards = [new Card("Qh"), new Card("Jh"), new Card("3h")];
     
     const results = HandEvaluator.outsToFlush(holeCards, communityCards);
     
-    // Expect one Out per missing heart candidate.
-    const expectedCandidates = ["2h", "4h", "5h", "6h", "7h", "8h", "9h", "Th", "Kh"].sort();
-    expect(results).to.be.an("array").with.lengthOf(expectedCandidates.length);
+    // With the updated logic, we expect one aggregated Out for the flush draw.
+    expect(results).to.be.an("array").with.lengthOf(1);
+    const out = results[0];
     
-    // Verify each Out object's properties.
-    results.forEach((out: Out) => {
-      expect(out.outHand).to.equal("Flush");
-      expect(out.possibleHand).to.be.true;
-      expect(out.cardNeededCount).to.equal(1);
-      // Each Out should have exactly one candidate card.
-      expect(out.cardsThatCanMakeHand).to.be.an("array").with.lengthOf(1);
-      const candidate = out.cardsThatCanMakeHand[0];
-      // The candidate card must be a heart.
-      expect(candidate.suit).to.equal("h");
-    });
+    // Verify the Out object properties.
+    expect(out.outHand).to.equal("Flush");
+    expect(out.possibleHand).to.be.true;
+    // Only one card is needed to complete the flush.
+    expect(out.cardNeededCount).to.equal(1);
     
-    // Aggregate candidate card strings from each Out.
-    const candidateStrings = results
-      .map((out: Out) => out.cardsThatCanMakeHand[0].toString())
-      .sort();
-    expect(candidateStrings).to.deep.equal(expectedCandidates);
+    // Verify that the held cards are the hearts in play.
+    const heldCards = out.cardsHeldForOut.map(c => c.toString()).sort();
+    expect(heldCards).to.deep.equal(["3h", "Ah", "Jh", "Qh"].sort());
     
-    // All Out objects should share the same held cards (the flush draw in hearts).
-    const heldCards = results[0].cardsHeldForOut.map(card => card.toString()).sort();
-    const expectedHeldCards = ["Ah", "3h", "Jh", "Qh"].sort();
-    expect(heldCards).to.deep.equal(expectedHeldCards);
+    // Verify candidate outs: they should aggregate every heart not in play.
+    // Suppose our authoritative order (values) is: 
+    // ["2", "3", "4", "5", "6", "7", "8", "9", "T", "J", "Q", "K", "A"].
+    // With "Ah", "Qh", "Jh", and "3h" in play, the remaining heart candidates are:
+    // "2h", "4h", "5h", "6h", "7h", "8h", "9h", "Th", "Kh".
+    const candidateOuts = out.cardsThatCanMakeHand.map(c => c.toString()).sort();
+    expect(candidateOuts).to.deep.equal(
+      ["2h", "4h", "5h", "6h", "7h", "8h", "9h", "Th", "Kh"].sort()
+    );
   });
 
-  it("should return candidate Out objects for flush draw when a suit has exactly four cards", () => {
+  it("should return an overall properly formed Outs object from calculateOuts", () => {
+    // This test uses calculateOuts to verify that all top-level fields are formed correctly.
+    // Setup: Hole cards: "As", "Ts"; Community cards: "9h", "7d", "2c"
+    // In this scenario, the only improvement is to pair one of the hole cards.
+    // Expected: two Out objects (one for pairing the Ace and one for pairing the Ten)
+    // and a combined outCards array of 6 candidate cards.
+    const hole = ["As", "Ts"].map(c => new Card(c));
+    const community = ["9h", "7d", "2c"].map(c => new Card(c));
+    
+    const result = HandEvaluator.calculateOuts(hole, community);
+    
+    // Check that the highest out improvement is "Pair"
+    expect(result.highestOutHand).to.equal("Pair");
+    
+    // Verify that there are exactly two Out objects (one for each eligible hole card over the board)
+    expect(result.outs).to.be.an("array").with.lengthOf(2);
+    
+    // Each Out should require exactly one card to complete the improvement.
+    result.outs.forEach(out => {
+      expect(out.cardNeededCount).to.equal(1);
+    });
+    
+    // Verify that the aggregated outCards field has exactly 6 candidate cards.
+    expect(result.outCards).to.be.an("array").with.lengthOf(6);
+  });
+
+  it("should return candidate Out object for flush draw when a suit has exactly four cards", () => {
     // Example: HoleCards: ["7h", "8h"]; CommunityCards: ["9h", "Th", "2c"]
-    // In hearts, we have 7h, 8h, 9h, Th (flush draw). Candidate outs are all missing heart cards.
+    // In hearts, we have 7h, 8h, 9h, Th (flush draw).
+    // The candidate outs should be aggregated into a single Out object.
     const holeCards = [new Card("7h"), new Card("8h")];
     const communityCards = [new Card("9h"), new Card("Th"), new Card("2c")];
     const results = HandEvaluator.outsToFlush(holeCards, communityCards);
     
-    expect(results).to.be.an("array").that.is.not.empty;
-    // For each candidate out, check the following:
-    results.forEach(out => {
-      expect(out.outHand).to.equal("Flush");
-      expect(out.possibleHand).to.be.true;
-      expect(out.cardNeededCount).to.equal(1);
-      expect(out.cardsThatCanMakeHand).to.be.an("array").with.lengthOf(1);
-      // The candidate card must be in hearts.
-      expect(out.cardsThatCanMakeHand[0].suit).to.equal("h");
-      // The cardsHeldForOut should equal exactly the 4 held heart cards.
-      const heldCards = out.cardsHeldForOut.map(c => c.toString()).sort();
-      expect(heldCards).to.deep.equal(["7h", "8h", "9h", "Th"].sort());
-    });
+    // We expect one Out object (for hearts)
+    expect(results).to.be.an("array").with.lengthOf(1);
+    
+    const out = results[0];
+    expect(out.outHand).to.equal("Flush");
+    expect(out.possibleHand).to.be.true;
+    expect(out.cardNeededCount).to.equal(1);
+    
+    // The cardsHeldForOut should be exactly the 4 held heart cards.
+    const heldCards = out.cardsHeldForOut.map(c => c.toString()).sort();
+    expect(heldCards).to.deep.equal(["7h", "8h", "9h", "Th"].sort());
+    
+    // The candidate outs should be an aggregated array of all hearts not in play.
+    // Assuming our authoritative order is: ["2","3","4","5","6","7","8","9","T","J","Q","K","A"],
+    // and held hearts are ["7h", "8h", "9h", "Th"],
+    // the expected candidate hearts are: ["2h","3h","4h","5h","6h","Jh","Qh","Kh","Ah"].
+    const candidateOuts = out.cardsThatCanMakeHand.map(c => c.toString()).sort();
+    expect(candidateOuts).to.deep.equal(
+      ["2h", "3h", "4h", "5h", "6h", "Jh", "Qh", "Kh", "Ah"].sort()
+    );
   });
 
   it("should return an empty array when no flush draw exists", () => {
