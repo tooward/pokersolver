@@ -609,47 +609,48 @@ export default class HandEvaluator {
       if (!communityCards || communityCards.length < 3 || communityCards.length > 5) {
         throw new Error("Community cards must be between 3 and 5");
       }
-      
-      const allCards = [...holeCards, ...communityCards];
     
-      // Determine the candidate pair.
-      // Prefer a pair from the hole cards; otherwise, see if a hole card pairs exactly once with community.
+      const allCards = [...holeCards, ...communityCards];
+      const hand = Hand.solve(allCards.map(c => c.toString()), new Game("standard"));
+      const handName = hand.name;
+      // Only a one pair hand can be upgraded to two pair.
+      if (handName !== "Pair") {
+        return [];
+      }
+    
+      // Determine the candidate value from the hole cards.
+      // First, if the hole cards are paired, use that value.
       let candidatePair: string | null = null;
       if (holeCards[0].value === holeCards[1].value) {
         candidatePair = holeCards[0].value;
       } else {
-        for (const card of holeCards) {
-          const count = allCards.filter(c => c.value === card.value).length;
-          if (count === 2) {
-            candidatePair = card.value;
-            break;
-          }
+        // Otherwise select the hole card that does NOT appear on the board (clean candidate).
+        const cleanHoleCandidates = holeCards.filter(
+          card => !communityCards.some(comm => comm.value === card.value)
+        );
+        if (cleanHoleCandidates.length > 0) {
+          // Choose the highest-ranked candidate using our authoritative order.
+          candidatePair = cleanHoleCandidates.sort(
+            (a, b) => values.indexOf(b.value) - values.indexOf(a.value)
+          )[0].value;
         }
       }
-      if (!candidatePair) {
-        return [];
-      }
+      
+      // If no candidate was determined, return empty.
+      if (!candidatePair) return [];
+      
+      // We require that the candidate appears exactly once (held only in the hole) to form a "clean" improvement.
+      const frequency = allCards.filter(card => card.value === candidatePair).length;
+      if (frequency !== 1) return [];
     
-      // From all cards (excluding the candidate pair), gather candidate values
-      // that appear only once in the community cards.
-      const candidateValues: string[] = [];
-      for (const card of allCards) {
-        if (card.value !== candidatePair) {
-          const communityCount = communityCards.filter(c => c.value === card.value).length;
-          if (communityCount < 2) {
-            candidateValues.push(card.value);
-          }
-        }
-      }
-      // Get unique candidate values.
-      const uniqueCandidates = Array.from(new Set(candidateValues));
-      if (uniqueCandidates.length === 0) {
+      // Also, if by chance the candidate appears on the board, then drawing it would form three-of-a-kind
+      // rather than a clean two pair.
+      if (communityCards.some(card => card.value === candidatePair)) {
         return [];
       }
       
-      // Sort the unique candidate values in descending order using our authoritative order.
-      uniqueCandidates.sort((a, b) => values.indexOf(b) - values.indexOf(a));
-      const candidate = uniqueCandidates[0];
+      // Use the candidatePair from the hole as the candidate.
+      const candidate = candidatePair;
       
       // Determine which suits for the candidate card are already in play.
       const inPlaySuits = new Set(allCards.filter(c => c.value === candidate).map(c => c.suit));
@@ -659,12 +660,13 @@ export default class HandEvaluator {
         return [];
       }
       
-      // Create candidate cards for missing suits.
+      // Create candidate cards for the missing suits.
       const candidateCards: Card[] = missingSuits.map(suit => new Card(candidate + suit));
       
-      // Build one Out object.
-      // The held cards for this candidate are all cards with the candidate value.
+      // Build a single Out object.
+      // The held cards for the candidate are those in the full hand that match the candidate value.
       const heldForCandidate = allCards.filter(c => c.value === candidate);
+      
       const outCandidate = new Out();
       outCandidate.outHand = "Two Pair";
       outCandidate.possibleHand = true;
