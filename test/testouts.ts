@@ -95,6 +95,76 @@ describe("HandEvaluator.calculateOuts", () => {
     expect(result.outs).to.be.empty;
   });
 
+  it("should return Four of a Kind out for hand 7♥ 7♦ | 7♣ 5♥ J♥ 5♠", () => {
+    const holeCards = [new Card("7h"), new Card("7d")];
+    const communityCards = [new Card("7c"), new Card("5h"), new Card("Jh"), new Card("5s")];
+    const result: Outs = HandEvaluator.calculateOuts(holeCards, communityCards);
+    
+    // Look for the Four of a Kind improvement out.
+    const fkOut = result.outs.find(out => out.outHand === "Four of a Kind");
+    expect(fkOut, "Expected Four of a Kind out to exist").to.exist;
+    expect(fkOut!.possibleHand).to.be.true;
+    expect(fkOut!.cardNeededCount).to.equal(1);
+    
+    // The held cards should be the three 7's already in play: 7♥, 7♦, and 7♣.
+    const heldCards = fkOut!.cardsHeldForOut.map(c => c.toString()).sort();
+    expect(heldCards).to.deep.equal(["7h", "7d", "7c"].sort());
+    
+    // The candidate card should be the missing 7, in this case "7s".
+    expect(fkOut!.cardsThatCanMakeHand).to.be.an("array").with.lengthOf(1);
+    expect(fkOut!.cardsThatCanMakeHand[0].toString()).to.equal("7s");
+});
+
+  it("should return two Out objects (Four of a Kind and Full House) for hand 7♠ 3♣ | 3♠ 3♥ A♦", () => {
+    // Setup the hand:
+    // Hole cards: 7♠, 3♣
+    // Community cards: 3♠, 3♥, A♦
+    const holeCards = [new Card("7s"), new Card("3c")];
+    const communityCards = [new Card("3s"), new Card("3h"), new Card("Ad")];
+    
+    // Calculate outs using the solver
+    const result: Outs = HandEvaluator.calculateOuts(holeCards, communityCards);
+    
+    // Expect exactly two Out objects to be returned.
+    expect(result.outs).to.be.an("array").with.lengthOf(2);
+    
+    // Find the Four of a Kind improvement and Full House improvement.
+    const fourKindOut = result.outs.find(o => o.outHand === "Four of a Kind");
+    const fullHouseOut = result.outs.find(o => o.outHand === "Full House");
+    
+    expect(fourKindOut, "Missing Four of a Kind Out").to.exist;
+    expect(fullHouseOut, "Missing Full House Out").to.exist;
+    
+    // --- Check Four of a Kind Out ---
+    // Trips of 3's are present from hole: 3♣ and community: 3♠, 3♥.
+    // The candidate candidate for Four of a Kind should be the missing 3♦.
+    const heldFour = fourKindOut!.cardsHeldForOut.map(c => c.toString()).sort();
+    expect(heldFour).to.deep.equal(["3c", "3h", "3s"].sort());
+    
+    expect(fourKindOut!.cardsThatCanMakeHand).to.be.an("array").with.lengthOf(1);
+    expect(fourKindOut!.cardsThatCanMakeHand[0].toString()).to.equal("3d");
+    
+    // --- Check Full House Out ---
+    // The full house improvement in a trips scenario uses an additional board card.
+    // Here, the board contains an Ace ("Ad") which can pair.
+    // The held cards for Full House should include the trips (all three 3's) plus "Ad".
+    const heldFull = fullHouseOut!.cardsHeldForOut.map(c => c.toString()).sort();
+    expect(heldFull).to.deep.equal(["3c", "3h", "3s", "7s", "Ad"].sort());
+    
+    // For the Full House Out, candidate outs should be all remaining Aces.
+    // Since "Ad" is in play, we expect the candidate outs to be the other three Aces.
+    const candidateValues = fullHouseOut!.cardsThatCanMakeHand.map(c => c.value);
+    expect(candidateValues).to.include("7");
+    expect(candidateValues).to.include("A");
+    
+    // Both outs require exactly one card to complete their improvement.
+    expect(fourKindOut!.cardNeededCount).to.equal(1);
+    expect(fullHouseOut!.cardNeededCount).to.equal(1);
+    
+    // Optionally, verify that the overall highestOutHand is one of the improvements.
+    expect(["Four of a Kind", "Full House"]).to.include(result.highestOutHand);
+  });
+
   it("should evaluate a high card hand and return Pair outs", () => {
     // High Card scenario:
     // Hole: 8♠, Q♣; Community: 3♦, 4♥, J♠.

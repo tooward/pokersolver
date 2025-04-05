@@ -207,23 +207,23 @@ export default class HandEvaluator {
           break;
         
         case "Four of a Kind":
-          // Only improvement is to a better four of a kind or a full house
-          // Not implemented
+          // No improvement possible
           break;
         
         case "Full House":
           // Improvement to a better full house or four of a kind
-          // Not implemented
+          this.addOutsToResult(result, this.outsToFourKind(holeCards, communityCards));
           break;
         
         case "Flush":
-          // Improvement to a better flush, full house, or straight flush
-          // Not implemented
+          // Improvement to a better flush (not checked), full house, or straight flush (checked for all hands at bottom if straight draw)
+          this.addOutsToResult(result, this.outsToFullHouse(holeCards, communityCards));
           break;
         
         case "Straight":
-          // Improvement to a better straight, flush, or straight flush
-          // Not implemented
+          // Improvement to a better straight, flush, or straight flush 
+          this.addOutsToResult(result, this.outsToFlush(holeCards, communityCards));
+          this.addOutsToResult(result, this.outsToStraightFlush(holeCards, communityCards));
           break;
         
         case "Three of a Kind":
@@ -269,6 +269,10 @@ export default class HandEvaluator {
         // Here's the key fix: Always check for inside straight draws, regardless of OESD results
         const insideOuts = this.outsToInsideStraightDraw(holeCards, communityCards);
         this.addOutsToResult(result, insideOuts);
+
+        // Here's the key fix: Always check for inside straight draws, regardless of OESD results
+        const strightFlushOUts = this.outsToStraightFlush(holeCards, communityCards);
+        this.addOutsToResult(result, strightFlushOUts);
       }
       
       // Remove duplicate out cards
