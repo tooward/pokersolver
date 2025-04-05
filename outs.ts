@@ -154,170 +154,196 @@ export default class HandEvaluator {
       }
 
     //TODO - Need to adjust calculateOuts()
-        // - Starting point is the best hand that can be made with community only cards, not just the players hand
-        // - 	1.	Clean outs → improve your hand without likely giving opponents a better one
-	      // -  2.	Dirty outs → improve you but also create a stronger hand for someone else (or tie)
-        // 1.	List every card that completes your best hand.
-        // 2.	Subtract any card that would ALSO give a better hand to an opponent.
-        // 3.	Subtract any card that makes the board a strong hand on its own (full house, straight, flush)
-    // TDOO - Need to calculate the board texture
+      // - Starting point is the best hand that can be made with community only cards, not just the players hand
+      // - 	1.	Clean outs → improve your hand without likely giving opponents a better one
+      // -  2.	Dirty outs → improve you but also create a stronger hand for someone else (or tie)
+      // 1.	List every card that completes your best hand.
+      // 2.	Subtract any card that would ALSO give a better hand to an opponent.
+      // 3.	Subtract any card that makes the board a strong hand on its own (full house, straight, flush)
+
+    /**
+     * This function calculates all possible outs from a given poker hand.
+     * It analyzes the current hand and returns all possible improvements.
+     */
     static calculateOuts(holeCards: Card[], communityCards: Card[]): Outs {
-      // check if hand is preflop
-      const outsContainer = new Outs();
-
-      // If preflop, return empty outs.
-      if (communityCards.length < 3) {
-        console.info("calculateOuts() - hand is preflop, returning empty outs");
-        return outsContainer;
-      }
-
-      // Set the cards onto the result
-      outsContainer.communityCards = communityCards;
-      outsContainer.holeCards = holeCards;
+      const result = new Outs();
+      result.holeCards = [...holeCards];
+      result.communityCards = [...communityCards];
+      
+      // Set the hand stage
       if (communityCards.length === 3) {
-        outsContainer.handStage = "Flop";
-      } else if (communityCards.length === 4) { 
-        outsContainer.handStage = "Turn";
-      } else if (communityCards.length === 5) { 
-        outsContainer.handStage = "River";
+        result.handStage = "Flop";
+      } else if (communityCards.length === 4) {
+        result.handStage = "Turn";
+      } else if (communityCards.length === 5) {
+        result.handStage = "River";
+      } else if (communityCards.length < 3) {
+        result.handStage = "Pre-Flop";
+        return result; // No outs calculation pre-flop
       }
+      
+      // Calculate the board texture
+      try {
+        result.boardTexture = this.evaluateBoard(communityCards);
+      } catch (e) {
+        console.warn("Unable to evaluate board texture:", e);
+      }
+      
+      // Create the hand evaluator
 
-      // Evaluate the board texture
-      outsContainer.boardTexture = HandEvaluator.evaluateBoard(communityCards);
-
-      // create a Hand object from the hole and community cards
+            // create a Hand object from the hole and community cards
       const allCards = HandEvaluator.combineHoleAndCommunity(holeCards, communityCards);
       const game = new Game("standard");
-      const hand = Hand.solve(allCards, game);
-  
-      // We check from high card upward
-      if (hand.name === HandRankings.highCard) {
-        const outs = this.outsToPair(holeCards, communityCards);
+//            const hand = Hand.solve(allCards, game);
+      const hand = Hand.solve(allCards.map(c => c.toString()), game);
+      const handRank = hand.rank;
+      const handName = hand.name;
+      
+      // Process based on current hand
+      switch (handName) {
+        case "Royal Flush":
+        case "Straight Flush":
+          // No improvement possible
+          break;
+        
+        case "Four of a Kind":
+          // Only improvement is to a better four of a kind or a full house
+          // Not implemented
+          break;
+        
+        case "Full House":
+          // Improvement to a better full house or four of a kind
+          // Not implemented
+          break;
+        
+        case "Flush":
+          // Improvement to a better flush, full house, or straight flush
+          // Not implemented
+          break;
+        
+        case "Straight":
+          // Improvement to a better straight, flush, or straight flush
+          // Not implemented
+          break;
+        
+        case "Three of a Kind":
+          // Improvement to full house or four of a kind
+          this.addOutsToResult(result, this.outsToFullHouse(holeCards, communityCards));
+          this.addOutsToResult(result, this.outsToFourKind(holeCards, communityCards));
+          break;
+        
+        case "Two Pair":
+          // Improvement to full house
+          this.addOutsToResult(result, this.outsToFullHouse(holeCards, communityCards));
+          break;
+        
+        case "Pair":
+          // Improvement to two pair or three of a kind
+          this.addOutsToResult(result, this.outsToTwoPair(holeCards, communityCards));
+          this.addOutsToResult(result, this.outsToThreeKind(holeCards, communityCards));
+          break;
+        
+        case "High Card":
+        default:
+          // Improvement to pair
+          const overCards = this.checkOverCards(holeCards, communityCards);
+          const pairOuts = this.outsToPair(holeCards, communityCards);
+          this.addOutsToResult(result, pairOuts);
+          break;
+      }
+      
+      // Check for flush draw (independent of current hand)
+      if (this.isFlushDraw(holeCards, communityCards)) {
+        this.addOutsToResult(result, this.outsToFlush(holeCards, communityCards));
+      }
+      
+      // Check for straight flush draw (independent of current hand)
+      this.addOutsToResult(result, this.outsToStraightFlush(holeCards, communityCards));
+      
+      // Check for straight draw (independent of current hand)
+      if (this.isStraightDraw(holeCards, communityCards)) {
+        // This adds both OESD and inside straight draws to the result
+        const oesdOuts = this.outsToStraightOESD(holeCards, communityCards);
+        this.addOutsToResult(result, oesdOuts);
+        
+        // Here's the key fix: Always check for inside straight draws, regardless of OESD results
+        const insideOuts = this.outsToInsideStraightDraw(holeCards, communityCards);
+        this.addOutsToResult(result, insideOuts);
+      }
+      
+      // Remove duplicate out cards
+      result.outCards = this.removeDuplicateCards(result.outCards);
+      
+      return result;
+    }
 
-        if (outs && outs.length > 0) {
-          for (const o of outs) {
-            outsContainer.outs.push(o);
-          }
-          outsContainer.highestOutHand = outs[0].outHand;
+    /**
+     * Adds the outs from the source array to the result Outs object.
+     * Updates the highestOutHand if the new outs have a higher rank.
+     */
+    private static addOutsToResult(result: Outs, outs: Out[]): void {
+      if (!outs || outs.length === 0) return;
+      
+      // Add each out to the result
+      for (const out of outs) {
+        result.outs.push(out);
+        
+        // Add each card from this out to the overall outCards array
+        for (const card of out.cardsThatCanMakeHand) {
+          result.outCards.push(card);
+        }
+        
+        // Update the highest out hand if needed
+        // This is a simple priority-based approach
+        const outHandPriority = this.getOutHandPriority(out.outHand);
+        const currentPriority = this.getOutHandPriority(result.highestOutHand);
+        
+        if (outHandPriority > currentPriority) {
+          result.highestOutHand = out.outHand;
         }
       }
+    }
 
-      if ( hand.name === HandRankings.pair ) {
-        const outs = this.outsToTwoPair(holeCards, communityCards);
-        if (outs && outs.length > 0) {
-          for (const o of outs) {
-            outsContainer.outs.push(o);
-          }
-          outsContainer.highestOutHand = outs[0].outHand;
-        }
+    /**
+     * Returns a numeric priority for a given hand type.
+     * Higher numbers represent better hands.
+     */
+    private static getOutHandPriority(handName: string): number {
+      const priorities: {[key: string]: number} = {
+        "Royal Flush": 10,
+        "Straight Flush": 9,
+        "Four of a Kind": 8,
+        "Full House": 7,
+        "Flush": 6,
+        "Straight": 5,
+        "Straight (OESD)": 5,
+        "Inside Straight Draw": 5,
+        "Three of a Kind": 4,
+        "Two Pair": 3,
+        "Pair": 2,
+        "High Card": 1,
+        "": 0
+      };
+      
+      return priorities[handName] || 0;
+    }
 
-        const outs3 = this.outsToThreeKind(holeCards, communityCards);
-        if (outs3 && outs3.length > 0) {
-          for (const o of outs3) {
-            outsContainer.outs.push(o);
-          }
-          outsContainer.highestOutHand = outs3[0].outHand;
-        }
-      }      
-
-      if ( hand.name === HandRankings.twopair ) {
-        const outs = this.outsToFullHouse(holeCards, communityCards);
-        if (outs && outs.length > 0) {
-          for (const o of outs) {
-            outsContainer.outs.push(o);
-          }
-          outsContainer.highestOutHand = outs[0].outHand;
-        }
-      }
-
-      if ( hand.name === HandRankings.threeofakind ) {
-        const outs = this.outsToFullHouse(holeCards, communityCards);
-        if (outs && outs.length > 0) {
-          for (const o of outs) {
-            outsContainer.outs.push(o);
-          }
-          outsContainer.highestOutHand = outs[0].outHand;
-        }
-
-        const out4 = this.outsToFourKind(holeCards, communityCards);
-        if (out4 && out4.length > 0) {
-          for (const o of out4) {
-            outsContainer.outs.push(o);
-          }
-          outsContainer.highestOutHand = out4[0].outHand;
-        }
-      }
-
-      // if this is a flush draw check for a flush out
-      const isFlushDraw = this.isFlushDraw(holeCards, communityCards);
-      if (isFlushDraw) {
-        const outs = this.outsToFlush(holeCards, communityCards);
-        if (outs && outs.length > 0) {
-          for (const o of outs) {
-            outsContainer.outs.push(o);
-          }
-          outsContainer.highestOutHand = outs[0].outHand;
+    /**
+     * Removes duplicate cards from an array of cards.
+     */
+    private static removeDuplicateCards(cards: Card[]): Card[] {
+      const uniqueCards: Card[] = [];
+      const seen = new Set<string>();
+      
+      for (const card of cards) {
+        const cardStr = card.toString();
+        if (!seen.has(cardStr)) {
+          seen.add(cardStr);
+          uniqueCards.push(card);
         }
       }
       
-      const isStraightDraw = this.isStraightDraw(holeCards, communityCards);
-      if (isStraightDraw) {
-        try {
-          const outs = this.outsToStraightOESD(holeCards, communityCards);
-          if (outs && outs.length > 0) {
-            for (const o of outs) {
-              outsContainer.outs.push(o);
-            }
-            outsContainer.highestOutHand = outs[0].outHand;
-          }
-        } catch (e) {
-          console.error("calculateOuts() - Error in outsToStraightOESD:", e);
-        }
-
-        try {
-          const outs = this.outsToInsideStraightDraw(holeCards, communityCards);
-          if (outs && outs.length > 0) {
-            for (const o of outs) {
-              outsContainer.outs.push(o);
-            }
-            outsContainer.highestOutHand = outs[0].outHand;
-          }
-        } catch (e) {
-          console.error("calculateOuts() - Error in outsToStraightGutshot:", e);
-        }
-      }
-
-      if (hand.name === HandRankings.straight) {
-        if (isFlushDraw) {
-          const outs = this.outsToStraightFlush(holeCards, communityCards);
-          if (outs && outs.length > 0) {
-            for (const o of outs) {
-              outsContainer.outs.push(o);
-            }
-            outsContainer.highestOutHand = outs[0].outHand;
-          }
-        }
-      }
-
-      // Consolidate unique candidate outs, ensure no duplicates
-      for (const candidateOut of outsContainer.outs) {
-        for (const card of candidateOut.cardsThatCanMakeHand) {
-          const candidateCardStr = card.toString(); // assumes toString() returns a unique identifier like "Ah"
-          if (!outsContainer.outCards.some(existingCard => existingCard.toString() === candidateCardStr)) {
-            outsContainer.outCards.push(card);
-          }
-        }
-      }
-
-      // Calculate the four and two percentages
-      if (outsContainer.handStage === "Flop") {
-        outsContainer.fourAndTwoPercent = outsContainer.outCards.length * 4;
-      }
-      else if (outsContainer.handStage === "Turn") {
-        outsContainer.fourAndTwoPercent = outsContainer.outCards.length * 2;
-      }
-
-      return outsContainer;
+      return uniqueCards;
     }
 
     /*
@@ -709,8 +735,6 @@ export default class HandEvaluator {
      * Evaluates the outs for an open‑ended straight draw (OESD).
      * An OESD draw is present when the hand has four consecutive ranks,
      * missing a card at either the low or high end to complete a 5‑card straight.
-     * This version returns an array of Out objects – one per candidate missing card.
-     * Each candidate Out indicates that only one card (cardNeededCount = 1) is needed.
      *
      * @param holeCards - Two Card objects representing the hole cards.
      * @param communityCards - Three to five Card objects representing the community cards.
@@ -722,79 +746,82 @@ export default class HandEvaluator {
         throw new Error("Must provide exactly two hole cards");
       if (!communityCards || communityCards.length < 3 || communityCards.length > 5)
         throw new Error("Community cards must be between 3 and 5");
-        
+    
       const allCards: Card[] = [...holeCards, ...communityCards];
       if (allCards.length < 5)
         throw new Error("At least five cards are required to evaluate an open ended straight draw");
-      
-      // Use the authoritative order from constants.
-      const cardValues = values; // e.g., ["1","2","3","4","5","6","7","8","9","T","J","Q","K","A"]
-      
-      // Get unique rank indices present in the hand.
+    
+      const cardValues = values; // e.g. ["2","3","4","5","6","7","8","9","T","J","Q","K","A"]
+    
+      // Create the set of unique rank indices in the hand.
       const uniqueRankIndices = Array.from(new Set(allCards.map(card => cardValues.indexOf(card.value)))).sort((a, b) => a - b);
-      
-      // Check if a straight is already made: if any five consecutive indices exist.
+    
+      // If a straight is already made, return [].
       for (let i = 0; i <= uniqueRankIndices.length - 5; i++) {
         if (uniqueRankIndices[i + 4] - uniqueRankIndices[i] === 4) {
-          // Hand already makes a straight; return empty outs.
-          return [];
+          return []; // A straight is already made.
         }
       }
-      
-      // Now proceed with evaluating an open-ended straight draw.
-      // Identify all contiguous 4-card blocks in the hand.
-      const results: Out[] = [];
-      const suits = ['s', 'h', 'd', 'c'];
-      // We'll try every possible 5-card span in cardValues.
+    
+      // Search for a block of 4 consecutive ranks that would be part of an OESD.
       for (let start = 0; start <= cardValues.length - 5; start++) {
         const span = [start, start + 1, start + 2, start + 3, start + 4];
-        // Count how many of these ranks are present.
         const present = span.filter(idx => uniqueRankIndices.includes(idx));
         if (present.length === 4) {
-          // Identify the missing index.
-          const missing = span.find(idx => !present.includes(idx));
-          if (missing !== undefined) {
-            // Get held cards: all cards in the span that are present.
-            const heldForBlock: Card[] = [];
-            span.forEach(idx => {
-              if (uniqueRankIndices.includes(idx)) {
-                // Add one card of that rank from allCards.
-                const found = allCards.find(card => card.value === cardValues[idx]);
-                if (found && !heldForBlock.some(c => c.toString() === found.toString()))
+          // Ensure that the present indices are consecutive
+          const consecutive = [...present].sort((a, b) => a - b);
+          if (consecutive[3] - consecutive[0] === 3) {
+            // For an OESD, the missing card must be at either end of the sequence.
+            const missingIdx = span.find(idx => !present.includes(idx));
+            if (missingIdx === span[0] || missingIdx === span[4]) {
+              const heldForBlock: Card[] = [];
+              for (const idx of present) {
+                const found = allCards.find(c => cardValues.indexOf(c.value) === idx);
+                if (found && !heldForBlock.some(c => c.toString() === found.toString())) {
                   heldForBlock.push(found);
+                }
               }
-            });
-            // For each suit candidate for the missing rank, create an Out.
-            suits.forEach(suit => {
-              const candidateRank = cardValues[missing];
-              if (candidateRank === "1") return;  // skip "1"
-              const candidateStr = candidateRank + suit;
-              if (allCards.some(card => card.toString() === candidateStr)) return;
-              const outCandidate = new Out();
-              outCandidate.outHand = "Straight (OESD)";
-              outCandidate.possibleHand = true;
-              outCandidate.cardNeededCount = 1;
-              outCandidate.cardsHeldForOut = heldForBlock.slice();
-              outCandidate.cardsThatCanMakeHand.push(new Card(candidateStr));
-              results.push(outCandidate);
-            });
+              // Generate candidate cards.
+              const candidateCards: Card[] = [];
+              // Candidate at the low end.
+              if (consecutive[0] > 0) {
+                const lowEndRank = cardValues[consecutive[0] - 1];
+                if (lowEndRank !== "1") { // Skip rank "1" if needed.
+                  candidateCards.push(new Card(lowEndRank + 's'));
+                }
+              }
+              // Candidate at the high end.
+              if (consecutive[3] < cardValues.length - 1) {
+                const highEndRank = cardValues[consecutive[3] + 1];
+                if (highEndRank !== "1") {
+                  candidateCards.push(new Card(highEndRank + 's'));
+                }
+              }
+              if (candidateCards.length > 0) {
+                // Aggregate both candidate cards into a single Out object.
+                const outCandidate = new Out();
+                outCandidate.outHand = "Straight (OESD)";
+                outCandidate.possibleHand = true;
+                outCandidate.cardNeededCount = 1;
+                outCandidate.cardsHeldForOut = heldForBlock.slice();
+                outCandidate.cardsThatCanMakeHand = candidateCards;
+                return [outCandidate];
+              }
+            }
           }
         }
       }
-      
-      return results;
+    
+      return [];
     }
     
     /**
      * Evaluates the outs for an inside straight draw (gutshot).
-     * An inside straight draw is present when the hand has 4 cards within a 5-card span with one missing rank in the middle.
-     * This updated version returns an array of Out objects—one for each candidate missing card.
-     * Each Out indicates that only one card (cardNeededCount = 1) is needed to complete the draw.
-     * The cardsHeldForOut field is populated with the cards from the hand that are used to form the draw.
+     * An inside straight draw is present when the hand has 4 cards that could form a straight with one missing card.
      *
      * @param holeCards - Two Card objects representing the hole cards.
      * @param communityCards - Three to five Card objects representing the community cards.
-     * @returns An array of Out objects representing each candidate inside straight draw.
+     * @returns An array containing a single Out object (or empty if no inside straight draw is found).
      * @throws Error if fewer than 4 cards are provided.
      */
     static outsToInsideStraightDraw(holeCards: Card[], communityCards: Card[]): Out[] {
@@ -810,65 +837,88 @@ export default class HandEvaluator {
         throw new Error("At least four cards are required to check for an inside straight draw");
       }
       
-      // Use the shared card order (or fallback to standard)
-      // const cardValues = (Array.isArray(values) && values.length > 0)
-      //   ? values
-      //   : ['2','3','4','5','6','7','8','9','T','J','Q','K','A'];
-      const cardValues = values;
-      
-      // Get unique sorted rank indices from all cards.
+      const cardValues = values; // e.g., ["2","3","4","5","6","7","8","9","T","J","Q","K","A"]
       const uniqueRanks = Array.from(new Set(allCards.map(card => cardValues.indexOf(card.value)))).sort((a, b) => a - b);
       
-      const results: Out[] = [];
-      const suits = ['s','h','d','c'];
-      const inPlay = new Set(allCards.map(card => card.value + card.suit));
+      // If a complete straight is already made, return no draw.
+      for (let i = 0; i <= uniqueRanks.length - 5; i++) {
+        if (uniqueRanks[i + 4] - uniqueRanks[i] === 4) {
+          return [];
+        }
+      }
       
-      // Iterate over every possible contiguous block of 5 ranks in the card order.
-      // For an inside straight draw, exactly 4 of the 5 ranks must be present,
-      // and the missing rank must be one of the inner three.
-      for (let start = 0; start <= cardValues.length - 5; start++) {
-        const seq = [start, start + 1, start + 2, start + 3, start + 4];
-        // Count how many of these candidate ranks are present in our hand.
-        const present = seq.filter(rankIdx => uniqueRanks.includes(rankIdx));
+      const suits = ['s', 'h', 'd', 'c'];
+      const inPlay = new Set(allCards.map(card => card.value + card.suit));
+      // Prepare a sorted copy of community cards.
+      const sortedCommunity = communityCards.slice().sort((a, b) => cardValues.indexOf(a.value) - cardValues.indexOf(b.value));
+      
+      let bestCandidateOut: Out | null = null;
+      let bestMissingRankIndex = Infinity;
+      let bestPresentSum = Infinity;
+      
+      // Search all possible 5-card spans.
+      for (let i = 0; i <= cardValues.length - 5; i++) {
+        const span = [i, i+1, i+2, i+3, i+4];
+        const present = span.filter(idx => uniqueRanks.includes(idx));
         if (present.length === 4) {
-          const missing = seq.find(r => !present.includes(r));
-          // Only consider an inside draw if the missing rank is not at the edge.
-          if (missing !== undefined && missing !== seq[0] && missing !== seq[4]) {
-            // Pick one representative card from the hand for each present rank.
-            const heldForBlock: Card[] = [];
-            for (const r of present) {
-              const found = allCards.find(c => cardValues.indexOf(c.value) === r);
-              if (found) {
-                heldForBlock.push(found);
+          const missingRankIndex = span.find(idx => !uniqueRanks.includes(idx));
+          if (missingRankIndex === undefined) continue;
+          
+          // NEW: Skip spans where the missing card is an extreme (open-ended),
+          // so we only consider inside (gutshot) draws.
+          if (missingRankIndex === span[0] || missingRankIndex === span[4]) {
+            continue;
+          }
+          
+          // Build the held cards for this candidate by preferring community cards.
+          const straightCards: Card[] = [];
+          for (const rankIndex of span) {
+            if (rankIndex !== missingRankIndex) {
+              let cardWithRank = sortedCommunity.find(card => cardValues.indexOf(card.value) === rankIndex);
+              if (!cardWithRank) {
+                cardWithRank = holeCards.find(card => cardValues.indexOf(card.value) === rankIndex);
+              }
+              if (cardWithRank) {
+                straightCards.push(cardWithRank);
               }
             }
-            // For each suit option for the missing rank not already in play,
-            // create a new Out object.
-            // Instead of pushing an Out for every candidate suit, do:
-            const candidateCards: Card[] = [];
-            for (const suit of suits) {
-              const candidateRank = cardValues[missing];
-              if (candidateRank === "1") continue; // skip rank "1"
-              const candidateStr = candidateRank + suit;
-              if (!inPlay.has(candidateStr)) {
-                candidateCards.push(new Card(candidateStr));
-              }
+          }
+          if (straightCards.length !== 4) continue;
+          
+          // Build candidate cards for the missing rank.
+          const missingRankValue = cardValues[missingRankIndex];
+          const candidateCards: Card[] = [];
+          for (const suit of suits) {
+            const candidateStr = missingRankValue + suit;
+            if (!inPlay.has(candidateStr)) {
+              candidateCards.push(new Card(candidateStr));
             }
-            if (candidateCards.length > 0) {
-              const outCandidate = new Out();
-              outCandidate.outHand = "Inside Straight Draw";
-              outCandidate.possibleHand = true;
-              outCandidate.cardNeededCount = 1;
-              outCandidate.cardsHeldForOut = heldForBlock.slice();
-              // Aggregate all candidate cards in one Out object.
-              outCandidate.cardsThatCanMakeHand = candidateCards;
-              results.push(outCandidate);
-            }
+          }
+          if (candidateCards.length === 0) continue;
+          
+          // Compute the sum of present rank indices.
+          const presentSum = present.reduce((sum, r) => sum + r, 0);
+          
+          // New tie-breaking: prefer lower missingRankIndex, and if equal, lower presentSum.
+          if (
+              bestCandidateOut === null ||
+              missingRankIndex < bestMissingRankIndex ||
+              (missingRankIndex === bestMissingRankIndex && presentSum < bestPresentSum)
+          ) {
+            bestMissingRankIndex = missingRankIndex;
+            bestPresentSum = presentSum;
+            const outCandidate = new Out();
+            outCandidate.outHand = "Inside Straight Draw";
+            outCandidate.possibleHand = true;
+            outCandidate.cardNeededCount = 1;
+            outCandidate.cardsHeldForOut = straightCards;
+            outCandidate.cardsThatCanMakeHand = candidateCards;
+            bestCandidateOut = outCandidate;
           }
         }
       }
       
-      return results;
+      return bestCandidateOut ? [bestCandidateOut] : [];
     }
 
     /*
@@ -961,7 +1011,7 @@ export default class HandEvaluator {
       const outs: Out[] = [];
       
       // Scenario 1: Trips scenario.
-      // Look for a rank with at least three cards.
+      // Look for a rank that appears at least three times.
       let tripsRank: string | null = null;
       for (const r in freq) {
         if (freq[r] >= 3) {
@@ -970,55 +1020,64 @@ export default class HandEvaluator {
         }
       }
       if (tripsRank) {
-        // The held trip (or more) cards.
+        // Held trip cards.
         const tripsCards = allCards.filter(card => card.value === tripsRank);
-        // Consider each candidate rank (different from tripsRank).
-        const otherRanks = Array.from(
+        // Consider candidate ranks different from tripsRank.
+        const candidateRanks = Array.from(
           new Set(allCards.filter(card => card.value !== tripsRank).map(card => card.value))
         );
-        for (const candidateRank of otherRanks) {
-          // Determine how many candidate cards are already held.
-          const candidateFreq = allCards.filter(card => card.value === candidateRank).length;
-          // To form a pair you need two cards. 
-          // If candidateFreq is 1, then only one card is needed.
-          const needed = 2 - candidateFreq;
-          // Only include candidate outs that require exactly one card to complete.
-          if (needed !== 1) continue;
-          // For each suit not already in play for candidateRank, create an Out.
-          for (const suit of suits) {
-            if (!allCards.some(card => card.value === candidateRank && card.suit === suit)) {
-              const outCandidate = new Out();
-              outCandidate.outHand = "Full House";
-              outCandidate.possibleHand = true;
-              outCandidate.cardNeededCount = needed; // will be 1.
-              outCandidate.cardsThatCanMakeHand.push(new Card(candidateRank + suit));
-              // Combine the held trip cards with any candidate cards already held.
-              const candidateHeld = allCards.filter(card => card.value === candidateRank);
-              outCandidate.cardsHeldForOut = tripsCards.concat(candidateHeld);
-              outs.push(outCandidate);
-            }
+        // We want to form a pair from the candidate rank. That means
+        // if a candidate already appears once, drawing one card would pair it.
+        // (We ignore candidates that appear 0 times.)
+        let aggregatedCandidateCards: Card[] = [];
+        let heldForCandidate: Card[] = [];
+        for (const cand of candidateRanks) {
+          const candCount = allCards.filter(card => card.value === cand).length;
+          if (candCount === 1) {
+            // For outs, return candidate cards for this rank that are not already in play.
+            const candidatesForRank = suits
+              .filter(suit => !allCards.some(card => card.value === cand && card.suit === suit))
+              .map(suit => new Card(cand + suit));
+            aggregatedCandidateCards = aggregatedCandidateCards.concat(candidatesForRank);
+            heldForCandidate = heldForCandidate.concat(allCards.filter(card => card.value === cand));
           }
+        }
+        if (aggregatedCandidateCards.length > 0) {
+          const outCandidate = new Out();
+          outCandidate.outHand = "Full House";
+          outCandidate.possibleHand = true;
+          outCandidate.cardNeededCount = 1;
+          // The held cards include both the trips and any candidate already present.
+          outCandidate.cardsHeldForOut = tripsCards.concat(heldForCandidate);
+          // Aggregate all candidate cards (only those missing from play).
+          outCandidate.cardsThatCanMakeHand = aggregatedCandidateCards;
+          outs.push(outCandidate);
         }
       }
       
       // Scenario 2: Two pair scenario.
-      // Look for at least two ranks that appear exactly twice.
+      // If no trips exist, check for two distinct pair ranks.
       const pairRanks = Object.keys(freq).filter(r => freq[r] === 2);
       if (pairRanks.length >= 2) {
-        for (const pairRank of pairRanks) {
-          const heldCards = allCards.filter(card => card.value === pairRank);
-          // To upgrade the pair to trips, only one additional card is needed.
-          for (const suit of suits) {
-            if (!allCards.some(card => card.value === pairRank && card.suit === suit)) {
-              const outCandidate = new Out();
-              outCandidate.outHand = "Full House";
-              outCandidate.possibleHand = true;
-              outCandidate.cardNeededCount = 1;
-              outCandidate.cardsThatCanMakeHand.push(new Card(pairRank + suit));
-              outCandidate.cardsHeldForOut = heldCards;
-              outs.push(outCandidate);
-            }
-          }
+        let aggregatedCandidateCards: Card[] = [];
+        let heldForCandidate: Card[] = [];
+        for (const pr of pairRanks) {
+          // For a pair that already exists, drawing one more card of that rank would form trips.
+          // Aggregate only candidate cards that are not already in play.
+          const candidatesForRank = suits
+            .filter(suit => !allCards.some(card => card.value === pr && card.suit === suit))
+            .map(suit => new Card(pr + suit));
+          aggregatedCandidateCards = aggregatedCandidateCards.concat(candidatesForRank);
+          heldForCandidate = heldForCandidate.concat(allCards.filter(card => card.value === pr));
+        }
+        if (aggregatedCandidateCards.length > 0) {
+          const outCandidate = new Out();
+          outCandidate.outHand = "Full House";
+          outCandidate.possibleHand = true;
+          outCandidate.cardNeededCount = 1;
+          outCandidate.cardsHeldForOut = heldForCandidate;
+          outCandidate.cardsThatCanMakeHand = aggregatedCandidateCards;
+          outs.push(outCandidate);
         }
       }
       
@@ -1036,43 +1095,77 @@ export default class HandEvaluator {
      * @returns Array of Out objects for each candidate that would result in a Straight Flush draw.
      */
     static outsToStraightFlush(holeCards: Card[], communityCards: Card[]): Out[] {
-      // Get flush candidate outs (note: outsToFlush now returns an array of Out objects)
-      const flushOuts: Out[] = HandEvaluator.outsToFlush(holeCards, communityCards);
-      if (!flushOuts || flushOuts.length === 0) {
-        // Without any flush draw, a straight flush cannot occur.
-        return [];
+      if (!holeCards || holeCards.length !== 2) {
+        throw new Error("Must provide exactly two hole cards");
       }
-      // Assume the flush suit is defined by the first candidate from flushOuts.
-      const flushSuit = flushOuts[0].cardsThatCanMakeHand[0].suit;
+      if (!communityCards || communityCards.length < 3 || communityCards.length > 5) {
+        throw new Error("Community cards must be between 3 and 5");
+      }
+      const allCards = [...holeCards, ...communityCards];
       
-      // Evaluate candidate straight draws.
-      const insideCandidates: Out[] = HandEvaluator.outsToInsideStraightDraw(holeCards, communityCards);
-      const oesdCandidates: Out[] = HandEvaluator.outsToStraightOESD(holeCards, communityCards);
-      // Combine all candidate straight draw outs.
-      const allCandidates: Out[] = insideCandidates.concat(oesdCandidates);
-      
-      const straightFlushOuts: Out[] = [];
-      // For each candidate whose candidate card is in the flush suit,
-      // create a separate Out object for the straight flush draw.
-      for (const candidate of allCandidates) {
-        if (candidate.possibleHand && candidate.cardsThatCanMakeHand.length > 0) {
-          const candidateCard = candidate.cardsThatCanMakeHand[0];
-          if (candidateCard.suit === flushSuit) {
-            const outCandidate = new Out();
-            outCandidate.outHand = "Straight Flush";
-            outCandidate.possibleHand = true;
-            // Only one card is needed to complete the straight flush.
-            outCandidate.cardNeededCount = 1;
-            // Copy the held cards from the candidate straight draw.
-            outCandidate.cardsHeldForOut = candidate.cardsHeldForOut.slice();
-            // Use the candidate card as the card that completes the flush.
-            outCandidate.cardsThatCanMakeHand.push(new Card(candidateCard.toString()));
-            straightFlushOuts.push(outCandidate);
-          }
+      // Determine a candidate flush suit: we’re looking for a suit present exactly 4 times (flush draw)
+      const suits = ['s', 'h', 'd', 'c'];
+      let flushSuit: string | null = null;
+      for (const s of suits) {
+        const cardsOfSuit = allCards.filter(card => card.suit === s);
+        if (cardsOfSuit.length === 4) {
+          flushSuit = s;
+          break;
         }
       }
+      if (!flushSuit) return [];
       
-      return straightFlushOuts;
+      // Work only with cards in the flush suit.
+      const flushCards = allCards.filter(card => card.suit === flushSuit);
+      
+      // Define the card order (using T instead of 10)
+      const cardValues = ["2","3","4","5","6","7","8","9","T","J","Q","K","A"];
+      
+      // Map flush cards to their rank indices.
+      const flushIndices = flushCards.map(card => cardValues.indexOf(card.value)).sort((a,b) => a - b);
+      if (flushIndices.length < 4) return [];
+      
+      // Look for a contiguous block of 4 cards in the flush suit.
+      let blockStart = -1;
+      for (let i = 0; i <= flushIndices.length - 4; i++){
+        if (flushIndices[i+3] - flushIndices[i] === 3) {
+          blockStart = flushIndices[i];
+          break;
+        }
+      }
+      if (blockStart === -1) return [];
+      
+      // The desired contiguous block (the held cards) spans from blockStart to blockStart+3.
+      const heldRankValues: string[] = [];
+      for (let r = blockStart; r < blockStart + 4; r++){
+        heldRankValues.push(cardValues[r]);
+      }
+      const heldCards = flushCards.filter(card => heldRankValues.includes(card.value));
+            
+      // For a 5-card straight flush draw, the full span would be from blockStart to blockStart+4.
+      // Determine the candidate outs (missing endpoints) – lower and upper.
+      const candidates: Card[] = [];
+      if (blockStart > 0) {
+        const lowerCandidate = new Card(cardValues[blockStart - 1] + flushSuit);
+        if (!allCards.some(card => card.toString() === lowerCandidate.toString())) {
+          candidates.push(lowerCandidate);
+        }
+      }
+      if (blockStart + 4 < cardValues.length) {
+        const upperCandidate = new Card(cardValues[blockStart + 4] + flushSuit);
+        if (!allCards.some(card => card.toString() === upperCandidate.toString())) {
+          candidates.push(upperCandidate);
+        }
+      }
+      if (candidates.length === 0) return [];
+      
+      const outCandidate = new Out();
+      outCandidate.outHand = "Straight Flush";
+      outCandidate.possibleHand = true;
+      outCandidate.cardNeededCount = 1;
+      outCandidate.cardsHeldForOut = heldCards;
+      outCandidate.cardsThatCanMakeHand = candidates;
+      return [outCandidate];
     }
 
     static outsToFourKind(holeCards: Card[], communityCards: Card[]): Out[] {
@@ -1129,35 +1222,3 @@ export default class HandEvaluator {
       return outsArray;
     }
   }
-
-/*
-I'd like to convert this Swift function to TypeScript. The functions purpose is to evaluate a hand and return back the outs the hand can make for a three of a kind hand in Texas Hold'em Poker. It should only evaluate the hand with the assumption that the hand is not made already. 
-
-The function should take two array's of Cards as inputs: holeCards and communityCards. The holeCards array will always have two cards and the communityCards array will have between 3 and 5 cards.
-
-It should return an Out object as the result which is defined in the out.ts file. The resulting out object should indicate if the two pair is possible via the possibleHand boolean, indicate the hand type using the pokersolver.ts hand types as a string value, indicate the number of cards needed for the out in total (which is the number of cards that can make the out) and the specific cards that form the outs in the cardsNeeded array. The hand types are listed in the handValues array for the standard gameRules, and is listed below also.
-
-If you see errors in the original Swift implementation you can adjust the function accordingly. Please use standard inputs of holeCards: Card[], communityCards: Card[]
-
-Please also create a set of unit tests for this function. The unit tests should evaluate all conditions for a hand that can be evaluated for outs that make two pair. The unit tests should be written in the standard Chai + Mocha format.
-
-          handValues: [
-            StraightFlush,
-            FourOfAKind,
-            FullHouse,
-            Flush,
-            Straight,
-            ThreeOfAKind,
-            TwoPair,
-            OnePair,
-            HighCard,
-          ],
-*/
-
-/*
-Similar to the last change, can you update the outsToInsideStraightDraw() function? The logic is sounds, but I need to return a single out object for each possible out, even of the same type. For example, I'd like to return an Out that can make a pair from each of the hole cards, not a single out for both. Note it is possible depending on the hand for it to more than one out per hole card.
-
-Also, can you adjust the cardsNeeded field on the Outs to be the number needed to form the hand, not the total outs possible. For example, holding a single card in the hole that makes a pair out would require just one card (not the three cards that are available to make the pair).
-
-Finally, can you ensure the cardsHeldForOut field is populated with the cards that are held in the hand that are used to make the out.
-*/
