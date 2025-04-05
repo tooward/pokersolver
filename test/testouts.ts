@@ -721,7 +721,7 @@ describe("HandEvaluator.outsToTwoPair", () => {
     expect(outs).to.be.an('array').with.lengthOf(1);
     
     const out = outs[0];
-    console.log("Out:", JSON.stringify(out, null, 2));
+//    console.log("Out:", JSON.stringify(out, null, 2));
     
     // Check the basic properties of the Out object
     expect(out.outHand).to.equal("Two Pair");
@@ -804,7 +804,7 @@ describe("HandEvaluator.outsToTwoPair", () => {
     const outs = HandEvaluator.outsToTwoPair(holeCards, communityCards);
     expect(outs).to.be.an("array").that.is.empty;
   });
-  
+
 });
 
 describe("HandEvaluator.outsToThreeKind", () => {
@@ -959,26 +959,52 @@ describe("HandEvaluator.outsToStraightOESD", () => {
     
     const outs = HandEvaluator.outsToStraightOESD(holeCards, communityCards);
     
-    // Expect a single Out object (one candidate hand) rather than one for every candidate card.
+    // Expect a single Out object.
     expect(outs).to.be.an("array").with.lengthOf(1);
     
     const out = outs[0];
     expect(out.outHand).to.equal("Straight (OESD)");
     expect(out.possibleHand).to.be.true;
-    // Only one card is needed to complete the straight.
+    // Exactly one card is needed to complete the straight.
     expect(out.cardNeededCount).to.equal(1);
     
-    // The aggregated candidate outs should contain both possible completing cards,
-    // in this example, the missing endpoints: one below the block and one above.
-    // With an ordered values array of ["2","3","4","5","6","7","8","9","T","J","Q","K","A"],
-    // the contiguous block from 6 to 9 is present => candidate outs should have values "5" and "T".
-    const candidateValues = out.cardsThatCanMakeHand.map(c => c.value).sort();
+    // Instead of comparing with an array of duplicates, we extract the unique candidate values.
+    const candidateValues = Array.from(
+      new Set(out.cardsThatCanMakeHand.map(c => c.value))
+    ).sort();
     expect(candidateValues).to.deep.equal(["5", "T"].sort());
     
     // The held cards should be the 4 cards forming the contiguous block.
     const heldCards = out.cardsHeldForOut.map(c => c.toString()).sort();
-    // Although the order is not important, we expect exactly the block cards.
     expect(heldCards).to.deep.equal(["6s", "7c", "8h", "9d"].sort());
+  });
+
+  it("should return a Straight out hand with eight outs for hole: T♣, 2♥ and community: Q♣, 9♠, 5♦, J♥", () => {
+    const holeCards = [new Card("Tc"), new Card("2h")];
+    const communityCards = [new Card("Qc"), new Card("9s"), new Card("5d"), new Card("Jh")];
+  
+    const result = HandEvaluator.calculateOuts(holeCards, communityCards);
+//    console.log("Result:", JSON.stringify(result, null, 2));
+    // We expect the best improvement to be a Straight.
+    expect(result.highestOutHand).to.equal("Straight (OESD)");
+    
+    // Find the Out object corresponding to the Straight improvement.
+    const straightOut = result.outs.find(out => out.outHand === "Straight (OESD)");
+    expect(straightOut, "A Straight improvement out should exist").to.exist;
+    
+    // For the straight draw, the contiguous block is expected to be the four cards:
+    // 9♠, T♣, J♥, Q♣ (when sorted by rank).
+    const heldBlock = straightOut!.cardsHeldForOut.map(c => c.toString()).sort();
+    expect(heldBlock).to.deep.equal(["9s", "Jh", "Qc", "Tc"].sort());
+    
+    // Exactly one card is needed to complete the straight.
+    expect(straightOut!.cardNeededCount).to.equal(1);
+    
+    // The aggregated candidate outs should total 8.
+    // For example, if the endpoints for the contiguous block (9,T,J,Q) are 8 (to complete 8-9-T-J-Q)
+    // and K (to complete 9-T-J-Q-K), then due to some suits already in play one endpoint might have 4 outs
+    // and the other 2 outs, summing to 6.
+    expect(straightOut!.cardsThatCanMakeHand).to.be.an("array").with.lengthOf(8);
   });
 
   it("should detect an OESD and return outs for both endpoints", () => {

@@ -748,77 +748,85 @@ export default class HandEvaluator {
      * @throws Error if inputs are invalid.
      */
     static outsToStraightOESD(holeCards: Card[], communityCards: Card[]): Out[] {
-      if (!holeCards || holeCards.length !== 2)
+      if (!holeCards || holeCards.length !== 2) {
         throw new Error("Must provide exactly two hole cards");
-      if (!communityCards || communityCards.length < 3 || communityCards.length > 5)
-        throw new Error("Community cards must be between 3 and 5");
-    
-      const allCards: Card[] = [...holeCards, ...communityCards];
-      if (allCards.length < 5)
-        throw new Error("At least five cards are required to evaluate an open ended straight draw");
-    
-      const cardValues = values; // e.g. ["2","3","4","5","6","7","8","9","T","J","Q","K","A"]
-    
-      // Create the set of unique rank indices in the hand.
-      const uniqueRankIndices = Array.from(new Set(allCards.map(card => cardValues.indexOf(card.value)))).sort((a, b) => a - b);
-    
-      // If a straight is already made, return [].
-      for (let i = 0; i <= uniqueRankIndices.length - 5; i++) {
-        if (uniqueRankIndices[i + 4] - uniqueRankIndices[i] === 4) {
-          return []; // A straight is already made.
-        }
       }
-    
-      // Search for a block of 4 consecutive ranks that would be part of an OESD.
-      for (let start = 0; start <= cardValues.length - 5; start++) {
-        const span = [start, start + 1, start + 2, start + 3, start + 4];
-        const present = span.filter(idx => uniqueRankIndices.includes(idx));
-        if (present.length === 4) {
-          // Ensure that the present indices are consecutive
-          const consecutive = [...present].sort((a, b) => a - b);
-          if (consecutive[3] - consecutive[0] === 3) {
-            // For an OESD, the missing card must be at either end of the sequence.
-            const missingIdx = span.find(idx => !present.includes(idx));
-            if (missingIdx === span[0] || missingIdx === span[4]) {
-              const heldForBlock: Card[] = [];
-              for (const idx of present) {
-                const found = allCards.find(c => cardValues.indexOf(c.value) === idx);
-                if (found && !heldForBlock.some(c => c.toString() === found.toString())) {
-                  heldForBlock.push(found);
-                }
-              }
-              // Generate candidate cards.
-              const candidateCards: Card[] = [];
-              // Candidate at the low end.
-              if (consecutive[0] > 0) {
-                const lowEndRank = cardValues[consecutive[0] - 1];
-                if (lowEndRank !== "1") { // Skip rank "1" if needed.
-                  candidateCards.push(new Card(lowEndRank + 's'));
-                }
-              }
-              // Candidate at the high end.
-              if (consecutive[3] < cardValues.length - 1) {
-                const highEndRank = cardValues[consecutive[3] + 1];
-                if (highEndRank !== "1") {
-                  candidateCards.push(new Card(highEndRank + 's'));
-                }
-              }
-              if (candidateCards.length > 0) {
-                // Aggregate both candidate cards into a single Out object.
-                const outCandidate = new Out();
-                outCandidate.outHand = "Straight (OESD)";
-                outCandidate.possibleHand = true;
-                outCandidate.cardNeededCount = 1;
-                outCandidate.cardsHeldForOut = heldForBlock.slice();
-                outCandidate.cardsThatCanMakeHand = candidateCards;
-                return [outCandidate];
-              }
-            }
+      if (!communityCards || communityCards.length < 3 || communityCards.length > 5) {
+        throw new Error("Community cards must be between 3 and 5");
+      }
+      
+      const allCards = [...holeCards, ...communityCards];
+      // Assume an authoritative order array exists:
+      const values = ["2", "3", "4", "5", "6", "7", "8", "9", "T", "J", "Q", "K", "A"];
+      
+      // Get distinct card values in sorted order (ascending by index)
+      const uniqueVals = Array.from(new Set(allCards.map(c => c.value)))
+        .sort((a, b) => values.indexOf(a) - values.indexOf(b));
+      
+      // Look for a contiguous block of 4 values.
+      let block: string[] | null = null;
+      for (let i = 0; i <= uniqueVals.length - 4; i++) {
+        const seq = uniqueVals.slice(i, i + 4);
+        let contiguous = true;
+        for (let j = 0; j < seq.length - 1; j++) {
+          if (values.indexOf(seq[j + 1]) !== values.indexOf(seq[j]) + 1) {
+            contiguous = false;
+            break;
           }
         }
+        if (contiguous) {
+          block = seq;
+          break;
+        }
       }
-    
-      return [];
+      if (!block) return [];
+      
+      // Identify candidate endpoints.
+      const lowerIndex = values.indexOf(block[0]) - 1;
+      const upperIndex = values.indexOf(block[block.length - 1]) + 1;
+      const candidates: Card[] = [];
+      const allSuits = ['s','h','d','c'];
+      
+      if (lowerIndex >= 0) {
+        const candidateVal = values[lowerIndex];
+        const inPlay = new Set(allCards.filter(c => c.value === candidateVal).map(c => c.suit));
+        // For every suit not already in play, add candidate card.
+        allSuits.forEach(suit => {
+          if (!inPlay.has(suit)) {
+            candidates.push(new Card(candidateVal + suit));
+          }
+        });
+      }
+      if (upperIndex < values.length) {
+        const candidateVal = values[upperIndex];
+        const inPlay = new Set(allCards.filter(c => c.value === candidateVal).map(c => c.suit));
+        allSuits.forEach(suit => {
+          if (!inPlay.has(suit)) {
+            candidates.push(new Card(candidateVal + suit));
+          }
+        });
+      }
+      
+      // In our test, for block ["9", "T", "J", "Q"]:
+      // lowerIndex gives candidate "8" ⇒ returns four candidate 8's,
+      // upperIndex gives candidate "K" ⇒ returns four candidate K's,
+      // so total candidate outs = 8.
+      
+      // For the held cards, return one representative card for each value in block.
+      const heldBlock: Card[] = [];
+      block.forEach(val => {
+        const card = allCards.find(c => c.value === val);
+        if (card) heldBlock.push(card);
+      });
+      
+      const out = new Out();
+      out.outHand = "Straight (OESD)";
+      out.possibleHand = true;
+      out.cardNeededCount = 1;
+      out.cardsHeldForOut = heldBlock;
+      out.cardsThatCanMakeHand = candidates;
+      
+      return [out];
     }
     
     /**
