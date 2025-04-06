@@ -86,6 +86,7 @@ describe("HandEvaluator.combineHoleAndCommunity", () => {
   });
 });
 
+//#region calculateOuts()
 describe("HandEvaluator.calculateOuts", () => {
   it("should return empty outs for a preflop scenario", () => {
     // Preflop (less than 3 community cards) should return an empty Outs container.
@@ -341,7 +342,9 @@ describe("HandEvaluator.calculateOuts", () => {
     expect(result.highestOutHand.toLowerCase()).to.include("straight");
   });
 });
+//#endregion
 
+//#region evaluateBoard()
 describe("HandEvaluator.evaluateBoard", () => {
   it("should throw an error when board has fewer than 3 cards", () => {
     const board = [new Card("2h"), new Card("3d")];
@@ -360,6 +363,72 @@ describe("HandEvaluator.evaluateBoard", () => {
     ];
     expect(() => HandEvaluator.evaluateBoard(board))
       .to.throw(PokerError.InsufficientCommunityCards);
+  });
+
+  it("should prioritize monotone over twoTone for 9♥ Q♥ 3♠ A♦ J♥", () => {
+    // Setup a board with 3 hearts plus other suits
+    const communityCards = [
+      new Card("9h"),
+      new Card("Qh"),
+      new Card("3s"),
+      new Card("Ad"),
+      new Card("Jh")
+    ];
+    
+    // Get the board texture analysis
+    const texture = HandEvaluator.evaluateBoard(communityCards);
+    
+    // Board should have 3 hearts, which makes it neither monotone (all same)
+    // nor twoTone (exactly 2 of one suit)
+    expect(texture.monotone, "Board is not monotone as cards are of different suits").to.be.false;
+
+    // board should be straightDraw with 9, J, Q, A as there are two different gutshot possibilities
+    expect(texture.straightDraw, "Board should have straight draw").to.equal("gutshot");
+    
+    // Since there are 3 hearts, it should have flushDraw=true
+    expect(texture.flushDraw, "Board should have flush draw with 3 hearts").to.be.true;
+    
+    // Should not be twoTone as there are 3 hearts (more than 2)
+    expect(texture.twoTone, "Board should not be twoTone as hearts exceed 2 cards").to.be.false;
+    
+    // Since we have 3 hearts (flush draw) the board should be wet
+    expect(texture.wet, "Board should be very wet as it is monotone and a gutshot").to.be.true;
+    expect(texture.dry, "Board should not be dry").to.be.false;
+    
+    // Additional checks:
+    // Check that there are no pairs
+    expect(texture.paired, "Board should have no pairs").to.be.false;
+    
+    // Check connectivity (ranks are [3, 9, J, Q, A] with gaps)
+    // Connectivity calculation: Board length (5) - 1 - (range span - (board length-1))
+    // = 4 - (12-4) = 4 - 8 = 0
+    expect(texture.connectivity).to.equal(0);
+  });
+
+  it("should correctly identify connectivity in a board with 4♠, 7♦, 2♣, 5♥", () => {
+    // Setup a board with cards that should have some connectivity
+    const communityCards = [
+      new Card("4s"),
+      new Card("7d"),
+      new Card("2c"),
+      new Card("5h")
+    ];
+    
+    // Get the board texture
+    const texture = HandEvaluator.evaluateBoard(communityCards);
+    
+    // In the given board, we have ranks [2,4,5,7]
+    // The range span is (7-2)=5, which is 1 more than a perfectly 
+    // consecutive sequence of length 4 (which would span 3)
+    // Therefore, the connectivity value should be (4-1) - (5-3) = 3 - 2 = 1
+    expect(texture.connectivity).to.equal(1);
+        
+    // Other checks that should be true
+    expect(texture.paired).to.be.false; // No pairs
+    expect(texture.monotone).to.be.false; // All different suits
+    
+    // Straight draw check - should be gutshot due to the gap
+    expect(texture.straightDraw).to.equal('gutshot');
   });
 
   it("should correctly evaluate a flop board with no pairs, no draws (e.g. '2h', '5d', '9s')", () => {
@@ -413,8 +482,49 @@ describe("HandEvaluator.evaluateBoard", () => {
     expect(texture.paired).to.be.false;
     expect(texture.straightDraw).to.equal("none");
   });
+
+  it("should correctly identify a wet board with monotone and strong draw potential", () => {
+    // Setup a board that is monotone; for example, four heart cards.
+    // With community cards "Ah", "Kh", "Qh", "Jh", the board is monotone,
+    // which should force it to be considered wet.
+    const communityCards = [
+      new Card("Ah"),
+      new Card("Kh"),
+      new Card("Qh"),
+      new Card("Jh")
+    ];
+    const texture = HandEvaluator.evaluateBoard(communityCards);
+    expect(texture.monotone).to.be.true;
+    // With a monotone board, we expect flush draws to be a concern.
+    expect(texture.flushDraw).to.be.true;
+    expect(texture.wet).to.be.true;
+    expect(texture.dry).to.be.false;
+  });
+
+  it("should correctly identify a dry board with low connectivity and no flush draw", () => {
+    // Setup a board with low connectivity and diverse suits such that no flush draw exists.
+    // Example: "2s", "7h", "9c" (all different suits, and ranks spread far apart).
+    const communityCards = [
+      new Card("2s"),
+      new Card("7h"),
+      new Card("9c")
+    ];
+    const texture = HandEvaluator.evaluateBoard(communityCards);
+    expect(texture.paired).to.be.false;
+    expect(texture.monotone).to.be.false;
+    // With one card per suit, flushDraw should be false.
+    expect(texture.flushDraw).to.be.false;
+    // The connectivity should be low; in this case, expect 0.
+    expect(texture.connectivity).to.equal(0);
+    // Under these conditions, the board is considered dry.
+    expect(texture.wet).to.be.false;
+    expect(texture.dry).to.be.true;
+  });
 });
 
+//#endregion
+
+//#region checkOverCards()
 describe('checkOverCards', () => {
   it('should return a hole card higher than all community cards', () => {
     const hole = ['As', 'Ts'].map(c => new Card(c));
@@ -477,6 +587,9 @@ describe('checkOverCards', () => {
   });
 });
 
+//#endregion
+
+//#region isFlushDraw()
 describe("HandEvaluator.isFlushDraw", () => {
   it("should return true if exactly four cards of a suit are present", () => {
     // Example: hole cards: Ah, 7h and community cards: 3h, 8h, 2d.
@@ -508,7 +621,9 @@ describe("HandEvaluator.isFlushDraw", () => {
     expect(result).to.be.false;
   });
 });
+//#endregion
 
+//#region isStraightDraw()
 describe("HandEvaluator.isStraightDraw", () => {
   it("should return true for an inside straight draw", () => {
     // Example: Hole: 8♠, 9♣; Community: 7♦, 10♠, 2♥.
@@ -563,12 +678,14 @@ describe("HandEvaluator.isStraightDraw", () => {
     expect(result).to.be.true;
   });
 });
+//#endregion
 
 // Helper: given an array of Out objects, return the held cards’ string values.
 function heldCardStrings(outs: any[]): string[] {
   return outs.map(out => out.cardsHeldForOut[0].toString());
 }
 
+//#region outsToPair()
 describe("HandEvaluator.outsToPair", () => {
 
   it("should return properly formed Out objects for Pair", () => {
@@ -703,6 +820,9 @@ describe("HandEvaluator.outsToPair", () => {
   });
 });
 
+//#endregion
+
+//#region outsToTwoPair()
 describe("HandEvaluator.outsToTwoPair", () => {
 
   it("should return properly formed Out objects for Two Pair", () => {
@@ -806,7 +926,9 @@ describe("HandEvaluator.outsToTwoPair", () => {
   });
 
 });
+//#endregion
 
+//#region outsToThreeKind()
 describe("HandEvaluator.outsToThreeKind", () => {
 
   it("should return properly formed Out object for Two Pair improvement when pairing the 8", () => {
@@ -945,7 +1067,9 @@ describe("HandEvaluator.outsToThreeKind", () => {
     }).to.throw("Community cards must be between 3 and 5");
   });
 });
+//#endregion
 
+//#region outsToStraightOESD()
 describe("HandEvaluator.outsToStraightOESD", () => {
 
   it("should return proper Out for an Open‑Ended Straight Draw", () => {
@@ -1063,8 +1187,9 @@ describe("HandEvaluator.outsToStraightOESD", () => {
     }).to.throw("Community cards must be between 3 and 5");
   });
 });
+//#endregion
 
-
+//#region outsToInsideStraightDraw()
 describe("HandEvaluator.outsToInsideStraightDraw", () => {
 
   it("should return properly formed Out for an Inside Straight Draw", () => {
@@ -1219,7 +1344,9 @@ describe("HandEvaluator.outsToInsideStraightDraw", () => {
     });
   });
 });
+//#endregion
 
+//#region outsToFlush()
 describe("HandEvaluator.outsToFlush", () => {
 
   it("should return properly formed Out for Flush", () => {
@@ -1369,7 +1496,9 @@ describe("HandEvaluator.outsToFlush", () => {
     }).to.throw("Must provide exactly two hole cards");
   });
 });
+//#endregion
 
+//#region outsToFullHouse()
 describe("HandEvaluator.outsToFullHouse", () => {
 
   it("should return a properly formed Out object for Full House (basic two pair scenario)", () => {
@@ -1544,7 +1673,9 @@ it("should return candidate outs for a two pair scenario", () => {
     expect(outs).to.be.an("array").that.is.empty;
   });
 });
+//#endregion
 
+//#region outsToStraightFlush()
 describe("HandEvaluator.outsToStraightFlush", () => {
 
   // Updated test for "should return properly formed Out for Straight Flush"
@@ -1661,7 +1792,9 @@ describe("HandEvaluator.outsToStraightFlush", () => {
     expect(results).to.be.an("array").that.is.empty;
   });
 });
+//#endregion
 
+//#region outsToFourKind()
 describe("HandEvaluator.outsToFourKind", () => {
 
   it("should return properly formed Out for Four of a Kind", () => {
@@ -1789,7 +1922,9 @@ describe("HandEvaluator.outsToFourKind", () => {
   });
 
 });
+//#endregion
 
+//#region checkCalculateOuts()
     // - one out should be for each possible hand
     // - ex: An A, T hole should return two outs - one for pair A, one for pair T
     // - this helps later when we need to show the possible combinations to the player
@@ -1810,6 +1945,6 @@ describe('checkCalculateOuts', () => {
     expect(result.outCards).to.have.lengthOf(6);
     expect(result.outs[0].cardNeededCount === 1);
   });
-
+//#endregion
 
 });

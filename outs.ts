@@ -2,7 +2,6 @@
 import { Card, Hand, Game } from './pokersolver';
 import { values } from './constants';
 
-
 export enum PokerError {
   PreflopNotAllowed = "PRE_FLOP_NOT_ALLOWED",
   InsufficientCommunityCards = "INSUFFICIENT_COMMUNITY_CARDS",
@@ -31,7 +30,9 @@ export class Outs {
     twoTone: false,  // true if there are two suits on the board
     connectivity: 0,  // 0 = disconnected → 4 = highly connected
     straightDraw: 'none',  // 'none', 'gutshot', or 'open'
-    flushDraw: false
+    flushDraw: false,
+    dry: false,  // true if the board is dry
+    wet: false   // true if the board is wet
   };
 }
 
@@ -86,7 +87,20 @@ export interface BoardTexture {
   connectivity: number    // 0 = disconnected → 4 = highly connected
   straightDraw: 'none'|'gutshot'|'open'
   flushDraw: boolean
+  dry: boolean
+  wet: boolean
 }
+
+export const BoardTextureDescriptions: { [K in keyof BoardTexture]: string } = {
+  paired: "True if there is at least one pair among the board cards.",
+  monotone: "True if all board cards are of the same suit.",
+  twoTone: "True if two cards of one suit are present among the board cards.",
+  connectivity: "Numeric measure (0 to 4) showing how closely the board cards are connected in rank.",
+  straightDraw: "Type of straight draw present: 'none', 'gutshot', or 'open'.",
+  flushDraw: "True if two cards of the same suit exists with the board cards setting up a player for a potential flush draw.",
+  dry: "True if the board is considered dry (little potential for straight or flush draws).",
+  wet: "True if the board is considered wet (lots of draw possibilities). Note that while not monotone 3 or more cards of same suit can help make a board wet."
+};
 
 export enum HandRankings {
   highCard = "High Card",
@@ -353,14 +367,10 @@ export default class HandEvaluator {
     /*
      * Evaluates the board texture based on the cards on the board.
     */
-    static evaluateBoard(board: Card[]): BoardTexture {
+    public static evaluateBoard(board: Card[]): BoardTexture {
       if (board.length < 3 || board.length > 5)
         throw new Error(PokerError.InsufficientCommunityCards);
     
-      // Use the shared cardValues if available, otherwise fallback to a standard array.
-      // const cardValues = (values && values.length > 0)
-      //   ? values
-      //   : ['2','3','4','5','6','7','8','9','T','J','Q','K','A'];
       const cardValues = values;
 
       // Collect suits and determine the index for each card rank.
@@ -390,12 +400,38 @@ export default class HandEvaluator {
       // Straight draw classification:
       // openDraw if the range is <= 4 and there is no pair.
       const openDraw = (ranks[n - 1] - ranks[0] <= 4 && !paired);
-      // Gutshot if not open-ended but connectivity is present.
-      const gutshot = !openDraw && connectivity >= 2 && !paired;
+
+      // Gutshot calculation needs to be more specific about gaps
+      // Check if there's a "one-card gap" within a 5-card span, which indicates a gutshot
+      let gutshot = false;
+      if (!openDraw && !paired) {
+        // For each possible starting point in a 5-card range
+        for (let i = 0; i <= ranks.length - 4; i++) {
+          // Calculate total span of 5 consecutive ranks
+          const rangeSpan = (ranks[Math.min(i+4, ranks.length-1)] - ranks[i]);
+          // If span is 5 or 6 (indicating one gap), and we have 4 cards, it's a gutshot
+          if ((rangeSpan === 5 || rangeSpan === 6) && (i+4 < ranks.length || ranks.length >= 4)) {
+            gutshot = true;
+            break;
+          }
+        }
+      }
     
       // Flush draw present if at least 2 cards are of the same suit.
       const flushDraw = maxSuit >= 2;
-    
+
+      // Determine if the board is wet or dry.
+      const wet = (
+        monotone ||                             // All cards of the same suit
+        maxSuit >= 3 ||                         // Three or more cards of the same suit makes it wet
+        flushDraw && (connectivity > 0 || openDraw) ||  // Flush draw combined with straight potential
+        connectivity >= 2 ||                    // At least moderately connected
+        openDraw ||                             // Open-ended straight draw explicitly present
+        (paired && (flushDraw || connectivity > 0)) // Paired boards only considered wet if combined with draws
+      );
+
+      const dry = !wet;
+
       return {
         paired,
         monotone,
@@ -403,6 +439,8 @@ export default class HandEvaluator {
         connectivity,
         straightDraw: openDraw ? 'open' : (gutshot ? 'gutshot' : 'none'),
         flushDraw,
+        dry,
+        wet
       };
     }
 
