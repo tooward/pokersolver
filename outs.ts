@@ -25,6 +25,7 @@ export class Outs {
   holeCards: Card[] = [];
   handStage: string = "";
   boardTexture: BoardTexture = {
+    highCard: false, 
     paired: false,  // true if there is a pair on the board
     monotone: false,  // true if all cards are of the same suit
     twoTone: false,  // true if there are two suits on the board
@@ -81,6 +82,7 @@ Implications:
 	•	If the turn or river adds the third suit card, flushes become possible.
 */
 export interface BoardTexture {
+  highCard: boolean
   paired: boolean
   monotone: boolean
   twoTone: boolean
@@ -93,6 +95,7 @@ export interface BoardTexture {
 
 export const BoardTextureDescriptions: { [K in keyof BoardTexture]: string } = {
   paired: "True if there is at least one pair among the board cards.",
+  highCard: "True if the board is unpaired, disconnected or only slightly connected, has no immediate flush, and includes at least one broadway card (A, K, Q, J, T).",
   monotone: "True if all board cards are of the same suit.",
   twoTone: "True if two cards of one suit are present among the board cards.",
   connectivity: "Numeric measure (0 to 4) showing how closely the board cards are connected in rank.",
@@ -431,8 +434,16 @@ export default class HandEvaluator {
       );
 
       const dry = !wet;
+      
+      // Check if the board contains at least one Broadway card (A, K, Q, J, T)
+      const broadwayCards = ["A", "K", "Q", "J", "T"];
+      const hasBroadway = board.some(card => broadwayCards.includes(card.value));
+      
+      // High card board check: Unpaired, disconnected or slightly connected, no flush, AND contains a Broadway card
+      const highCard = !paired && connectivity <= 1 && !monotone && maxSuit < 3 && hasBroadway;
 
       return {
+        highCard,
         paired,
         monotone,
         twoTone,

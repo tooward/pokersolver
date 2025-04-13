@@ -520,6 +520,72 @@ describe("HandEvaluator.evaluateBoard", () => {
     expect(texture.wet).to.be.false;
     expect(texture.dry).to.be.true;
   });
+
+    it('should correctly identify a high card board', () => {
+      // A high card board - unpaired, disconnected (or slightly connected), no flush potential
+      const board = [new Card('2h'), new Card('7s'), new Card('Jd')];
+      const texture = HandEvaluator.evaluateBoard(board);
+      
+      expect(texture.highCard).to.be.true;
+      expect(texture.paired).to.be.false;
+      expect(texture.connectivity).to.be.lessThanOrEqual(1);
+      expect(texture.monotone).to.be.false;
+    });
+
+    it('should correctly identify a high card board with Broadway cards', () => {
+      // A high card board - unpaired, disconnected, no flush, WITH Broadway card
+      const board = [new Card('Kh'), new Card('7s'), new Card('2d')];
+      const texture = HandEvaluator.evaluateBoard(board);
+      
+      expect(texture.highCard).to.be.true;
+      expect(texture.paired).to.be.false;
+      expect(texture.connectivity).to.be.lessThanOrEqual(1);
+      expect(texture.monotone).to.be.false;
+    });
+
+    it('should not identify as high card board when no Broadway cards present', () => {
+      // A board that meets other high card criteria but has no Broadway cards
+      const board = [new Card('9h'), new Card('7s'), new Card('2d')];
+      const texture = HandEvaluator.evaluateBoard(board);
+      
+      expect(texture.highCard).to.be.false;
+    });
+
+    it('should correctly identify a non-high card board due to pairing', () => {
+      // A paired board should not be a high card board
+      const board = [new Card('2h'), new Card('2s'), new Card('Jd')];
+      const texture = HandEvaluator.evaluateBoard(board);
+      
+      expect(texture.highCard).to.be.false;
+      expect(texture.paired).to.be.true;
+    });
+
+    it('should correctly identify a non-high card board due to connectivity', () => {
+      // A connected board should not be a high card board
+      const board = [new Card('7h'), new Card('8s'), new Card('9d')];
+      const texture = HandEvaluator.evaluateBoard(board);
+      
+      expect(texture.highCard).to.be.false;
+      expect(texture.connectivity).to.be.greaterThan(1);
+    });
+
+    it('should correctly identify a non-high card board due to flush potential', () => {
+      // A monotone board or board with 3+ cards of same suit should not be a high card board
+      const board = [new Card('2h'), new Card('7h'), new Card('Jh')];
+      const texture = HandEvaluator.evaluateBoard(board);
+      
+      expect(texture.highCard).to.be.false;
+      expect(texture.monotone).to.be.true;
+    });
+
+    it('should identify a high card board with slight connectivity', () => {
+      // A board with slight connectivity but still qualifying as high card
+      const board = [new Card('2h'), new Card('4s'), new Card('Jd')];
+      const texture = HandEvaluator.evaluateBoard(board);
+      
+      expect(texture.highCard).to.be.true;
+      expect(texture.connectivity).to.equal(1);
+    });
 });
 
 //#endregion
